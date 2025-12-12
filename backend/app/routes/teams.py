@@ -13,6 +13,7 @@ from urllib.parse import quote
 
 from app.services.teams_service import teams_service, TeamsMention, TeamsServiceError
 from app.core.config import settings
+from app.utils.message_merger import MessageMergerConfig
 
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -38,6 +39,13 @@ class MentionResponse(BaseModel):
     graph_metadata: Optional[dict] = None
     # Status field
     status: Optional[str] = "Open"
+    # Message merging fields
+    is_merged: Optional[bool] = False
+    message_count: Optional[int] = 1
+    original_message_ids: Optional[List[str]] = None
+    timestamp_start: Optional[datetime] = None
+    timestamp_end: Optional[datetime] = None
+    merged_text: Optional[str] = None
 
 
 class MentionsResponse(BaseModel):
@@ -52,6 +60,20 @@ class TeamsStatusResponse(BaseModel):
     """Response model for Teams integration status."""
     is_configured: bool
     message: str
+
+
+class MessageMergeConfigResponse(BaseModel):
+    """Response model for message merge configuration."""
+    enabled: bool
+    time_window_seconds: int
+    merge_same_chat_only: bool
+
+
+class UpdateMessageMergeConfigRequest(BaseModel):
+    """Request model for updating message merge configuration."""
+    enabled: Optional[bool] = None
+    time_window_seconds: Optional[int] = None
+    merge_same_chat_only: Optional[bool] = None
 
 
 @router.get("/status", response_model=TeamsStatusResponse)
@@ -73,6 +95,54 @@ async def get_teams_status():
         )
 
     return TeamsStatusResponse(is_configured=is_configured, message=message)
+
+
+@router.get("/merge-config", response_model=MessageMergeConfigResponse)
+async def get_merge_config():
+    """
+    Get current message merge configuration.
+
+    Returns the current settings for message merging behavior.
+    """
+    return MessageMergeConfigResponse(
+        enabled=teams_service.message_merger.config.enable_merging,
+        time_window_seconds=teams_service.message_merger.config.time_window_seconds,
+        merge_same_chat_only=teams_service.message_merger.config.merge_same_chat_only,
+    )
+
+
+@router.post("/merge-config", response_model=MessageMergeConfigResponse)
+async def update_merge_config(request: UpdateMessageMergeConfigRequest):
+    """
+    Update message merge configuration.
+
+    Allows dynamic updating of merge behavior without restarting the server.
+
+    Args:
+        request: Configuration updates (only provided fields will be updated)
+
+    Returns:
+        Updated configuration
+    """
+    config = teams_service.message_merger.config
+
+    if request.enabled is not None:
+        config.enable_merging = request.enabled
+    if request.time_window_seconds is not None:
+        if request.time_window_seconds < 1 or request.time_window_seconds > 300:
+            raise HTTPException(
+                status_code=400,
+                detail="time_window_seconds must be between 1 and 300"
+            )
+        config.time_window_seconds = request.time_window_seconds
+    if request.merge_same_chat_only is not None:
+        config.merge_same_chat_only = request.merge_same_chat_only
+
+    return MessageMergeConfigResponse(
+        enabled=config.enable_merging,
+        time_window_seconds=config.time_window_seconds,
+        merge_same_chat_only=config.merge_same_chat_only,
+    )
 
 
 @router.get("/mentions", response_model=MentionsResponse)
@@ -112,6 +182,13 @@ async def get_mentions(
                 requested_by=m.requested_by,
                 requested_at=m.requested_at,
                 graph_metadata=m.graph_metadata,
+                status=m.status,
+                is_merged=m.is_merged,
+                message_count=m.message_count,
+                original_message_ids=m.original_message_ids,
+                timestamp_start=m.timestamp_start,
+                timestamp_end=m.timestamp_end,
+                merged_text=m.merged_text,
             )
             for m in mentions
         ]
@@ -349,6 +426,13 @@ async def get_user_mentions(
                 requested_by=m.requested_by,
                 requested_at=m.requested_at,
                 graph_metadata=m.graph_metadata,
+                status=m.status,
+                is_merged=m.is_merged,
+                message_count=m.message_count,
+                original_message_ids=m.original_message_ids,
+                timestamp_start=m.timestamp_start,
+                timestamp_end=m.timestamp_end,
+                merged_text=m.merged_text,
             )
             for m in mentions
         ]

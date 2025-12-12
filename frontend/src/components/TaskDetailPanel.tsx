@@ -44,6 +44,8 @@ export function TaskDetailPanel({ task, onClose, onTaskUpdated, onTaskDeleted }:
   const [reminderDate, setReminderDate] = useState('');
   const [reminderTime, setReminderTime] = useState('');
   const [reminderLoading, setReminderLoading] = useState(false);
+  const [reminderError, setReminderError] = useState('');
+  const [reminderSuccess, setReminderSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
 
@@ -100,17 +102,36 @@ export function TaskDetailPanel({ task, onClose, onTaskUpdated, onTaskDeleted }:
   };
 
   const handleSetReminder = async () => {
-    if (!reminderDate || !reminderTime) return;
+    if (!reminderDate || !reminderTime) {
+      setReminderError('Please select both date and time');
+      return;
+    }
+
+    // Validate that the reminder is in the future
+    const remindAt = new Date(`${reminderDate}T${reminderTime}`);
+    const now = new Date();
+    if (remindAt <= now) {
+      setReminderError('Reminder must be set for a future date and time');
+      return;
+    }
 
     setReminderLoading(true);
+    setReminderError('');
+    setReminderSuccess(false);
+
     try {
-      const remindAt = new Date(`${reminderDate}T${reminderTime}`).toISOString();
-      await reminderApi.create(task.id, remindAt);
+      await reminderApi.create(task.id, remindAt.toISOString());
       onTaskUpdated();
       setReminderDate('');
       setReminderTime('');
-    } catch (err) {
-      console.error(err);
+      setReminderSuccess(true);
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setReminderSuccess(false), 3000);
+    } catch (err: any) {
+      console.error('Failed to create reminder:', err);
+      const errorMsg = err?.response?.data?.detail || 'Failed to create reminder. Please try again.';
+      setReminderError(errorMsg);
     } finally {
       setReminderLoading(false);
     }
@@ -380,14 +401,20 @@ export function TaskDetailPanel({ task, onClose, onTaskUpdated, onTaskDeleted }:
             <input
               type="date"
               value={reminderDate}
-              onChange={(e) => setReminderDate(e.target.value)}
+              onChange={(e) => {
+                setReminderDate(e.target.value);
+                setReminderError('');
+              }}
               min={new Date().toISOString().split('T')[0]}
               title="Select date"
             />
             <input
               type="time"
               value={reminderTime}
-              onChange={(e) => setReminderTime(e.target.value)}
+              onChange={(e) => {
+                setReminderTime(e.target.value);
+                setReminderError('');
+              }}
               title="Select time"
             />
             <motion.button
@@ -415,6 +442,31 @@ export function TaskDetailPanel({ task, onClose, onTaskUpdated, onTaskDeleted }:
               )}
             </motion.button>
           </div>
+
+          <AnimatePresence>
+            {reminderError && (
+              <motion.div
+                className="reminder-error"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <AlertCircle size={14} />
+                {reminderError}
+              </motion.div>
+            )}
+            {reminderSuccess && (
+              <motion.div
+                className="reminder-success"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <CheckCircle2 size={14} />
+                Reminder set successfully!
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {task.reminders.length > 0 && (
             <motion.div

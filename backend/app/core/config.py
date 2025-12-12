@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     MS_GRAPH_SECRET_ID: str = ""
     MS_GRAPH_REDIRECT_URI: str = "http://localhost:5173/auth/callback"
 
+    # Message merging configuration
+    MESSAGE_MERGE_ENABLED: bool = True
+    MESSAGE_MERGE_TIME_WINDOW_SECONDS: int = 10
+    MESSAGE_MERGE_SAME_CHAT_ONLY: bool = True
+
     class Config:
         env_file = ".env"
 

@@ -180,6 +180,13 @@ export interface TeamsMention {
   graph_metadata?: Record<string, any> | null;
   // Status field
   status?: string | null; // 'Open', 'In Progress', 'Done'
+  // Message merging fields
+  is_merged?: boolean;
+  message_count?: number;
+  original_message_ids?: string[];
+  timestamp_start?: string | null;
+  timestamp_end?: string | null;
+  merged_text?: string | null;
 }
 
 export interface TeamsMentionsResponse {

@@ -93,6 +93,20 @@ export const reminderApi = {
     return response.data;
   },
 
+  update: async (id: number, remindAt: string): Promise<Reminder> => {
+    const response = await api.patch<Reminder>(`/reminders/${id}`, {
+      remind_at: remindAt,
+    });
+    return response.data;
+  },
+
+  snooze: async (id: number, minutes: number): Promise<Reminder> => {
+    const response = await api.post<Reminder>(`/reminders/${id}/snooze`, {
+      minutes,
+    });
+    return response.data;
+  },
+
   getAll: async (): Promise<Reminder[]> => {
     const response = await api.get<Reminder[]>('/reminders');
     return response.data;

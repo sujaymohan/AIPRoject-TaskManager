@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format } from 'date-fns';
-import { Bell, ChevronDown, ChevronRight, AlertTriangle, Calendar, X, Loader2 } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { Bell, ChevronDown, AlertTriangle, Calendar, X, Loader2, Clock, AlertCircle } from 'lucide-react';
 import { reminderApi } from '../api/client';
 import type { Reminder } from '../types';
 
@@ -14,6 +14,53 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
   const [notifications, setNotifications] = useState<Reminder[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [snoozing, setSnoozing] = useState<Set<number>>(new Set());
+  const notifiedIds = useRef<Set<number>>(new Set());
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          setNotificationPermission(permission);
+        });
+      }
+    }
+  }, []);
+
+  const showBrowserNotification = useCallback((reminder: Reminder) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      // Check if we've already notified for this reminder
+      if (notifiedIds.current.has(reminder.id)) {
+        return;
+      }
+
+      const notification = new Notification('TaskFlow Reminder', {
+        body: reminder.task_text || 'You have a task reminder',
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: `reminder-${reminder.id}`,
+        requireInteraction: true,
+        vibrate: [200, 100, 200],
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        setExpanded(true);
+        notification.close();
+      };
+
+      // Mark as notified
+      notifiedIds.current.add(reminder.id);
+
+      // Auto-close after 10 seconds if user doesn't interact
+      setTimeout(() => {
+        notification.close();
+      }, 10000);
+    }
+  }, []);
 
   const fetchReminders = useCallback(async () => {
     setLoading(true);
@@ -22,29 +69,62 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
         reminderApi.getPending(),
         reminderApi.getNotifications(),
       ]);
+
       setReminders(pending);
+
+      // Check for new notifications and trigger browser notifications
+      if (notifs.length > 0) {
+        notifs.forEach(notif => {
+          if (!notifications.find(n => n.id === notif.id)) {
+            // New notification appeared, show browser notification
+            showBrowserNotification(notif);
+          }
+        });
+      }
+
       setNotifications(notifs);
     } catch (err) {
       console.error('Failed to fetch reminders:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [notifications, showBrowserNotification]);
 
   useEffect(() => {
     fetchReminders();
 
-    // Poll for notifications every 30 seconds
-    const interval = setInterval(fetchReminders, 30000);
+    // Poll for notifications every 15 seconds (more responsive than 30)
+    const interval = setInterval(fetchReminders, 15000);
     return () => clearInterval(interval);
   }, [fetchReminders, refreshTrigger]);
 
   const handleDismiss = async (id: number) => {
     try {
       await reminderApi.delete(id);
+      // Remove from notified set so it can be notified again if recreated
+      notifiedIds.current.delete(id);
       fetchReminders();
     } catch (err) {
       console.error('Failed to dismiss reminder:', err);
+    }
+  };
+
+  const handleSnooze = async (id: number, minutes: number) => {
+    setSnoozing(prev => new Set(prev).add(id));
+    try {
+      await reminderApi.snooze(id, minutes);
+      // Remove from notified set so it can be notified again
+      notifiedIds.current.delete(id);
+      fetchReminders();
+    } catch (err) {
+      console.error('Failed to snooze reminder:', err);
+      alert('Failed to snooze reminder. Please try again.');
+    } finally {
+      setSnoozing(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
     }
   };
 
@@ -70,9 +150,14 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
               <motion.span
                 className="notification-badge"
                 initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
+                animate={{ scale: [1, 1.2, 1] }}
                 exit={{ scale: 0 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                transition={{
+                  scale: { duration: 0.5, repeat: Infinity, repeatDelay: 2 },
+                  type: 'spring',
+                  stiffness: 500,
+                  damping: 25
+                }}
               >
                 {notifications.length}
               </motion.span>
@@ -118,6 +203,33 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
               </motion.div>
             )}
 
+            {/* Notification permission warning */}
+            {notificationPermission !== 'granted' && (
+              <motion.div
+                className="notification-warning"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <AlertCircle size={14} />
+                <span>Enable notifications for reminders</span>
+                <motion.button
+                  className="enable-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if ('Notification' in window) {
+                      Notification.requestPermission().then(permission => {
+                        setNotificationPermission(permission);
+                      });
+                    }
+                  }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Enable
+                </motion.button>
+              </motion.div>
+            )}
+
             <AnimatePresence>
               {notifications.length > 0 && (
                 <motion.div
@@ -128,7 +240,7 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
                 >
                   <div className="section-title">
                     <AlertTriangle size={14} />
-                    <h4>Needs attention</h4>
+                    <h4>Needs attention ({notifications.length})</h4>
                   </div>
                   {notifications.map((notif, idx) => (
                     <motion.div
@@ -141,22 +253,51 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
                     >
                       <div className="notification-content">
                         <p>{notif.task_text}</p>
-                        <span className="due-time">
-                          <Calendar size={12} />
-                          {format(new Date(notif.remind_at), 'PPp')}
+                        <span className="due-time overdue">
+                          <Clock size={12} />
+                          {formatDistanceToNow(new Date(notif.remind_at), { addSuffix: true })}
                         </span>
                       </div>
-                      <motion.button
-                        className="dismiss-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDismiss(notif.id);
-                        }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                      >
-                        <X size={14} />
-                      </motion.button>
+                      <div className="notification-actions">
+                        <motion.button
+                          className="snooze-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSnooze(notif.id, 10);
+                          }}
+                          disabled={snoozing.has(notif.id)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          title="Snooze for 10 minutes"
+                        >
+                          {snoozing.has(notif.id) ? <Loader2 size={12} className="spinning" /> : '10m'}
+                        </motion.button>
+                        <motion.button
+                          className="snooze-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSnooze(notif.id, 30);
+                          }}
+                          disabled={snoozing.has(notif.id)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          title="Snooze for 30 minutes"
+                        >
+                          {snoozing.has(notif.id) ? <Loader2 size={12} className="spinning" /> : '30m'}
+                        </motion.button>
+                        <motion.button
+                          className="dismiss-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDismiss(notif.id);
+                          }}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          title="Dismiss reminder"
+                        >
+                          <X size={14} />
+                        </motion.button>
+                      </div>
                     </motion.div>
                   ))}
                 </motion.div>
@@ -171,7 +312,7 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
             >
               <div className="section-title">
                 <Calendar size={14} />
-                <h4>Coming up</h4>
+                <h4>Coming up ({upcomingReminders.length})</h4>
               </div>
               {upcomingReminders.length === 0 ? (
                 <motion.p
@@ -179,7 +320,7 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 >
-                  No reminders scheduled yet
+                  No upcoming reminders
                 </motion.p>
               ) : (
                 upcomingReminders.map((reminder, idx) => (
@@ -195,7 +336,7 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
                       <p>{reminder.task_text}</p>
                       <span className="remind-time">
                         <Calendar size={12} />
-                        {format(new Date(reminder.remind_at), 'PPp')}
+                        {formatDistanceToNow(new Date(reminder.remind_at), { addSuffix: true })}
                       </span>
                     </div>
                     <motion.button
@@ -206,6 +347,7 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
                       }}
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
+                      title="Delete reminder"
                     >
                       <X size={12} />
                     </motion.button>

@@ -45,7 +45,7 @@ export function TeamsMentionsModal({
   const [mockMessage, setMockMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processSuccess, setProcessSuccess] = useState(false);
-  const [mentionLimit, setMentionLimit] = useState(25);
+  const [mentionLimit, setMentionLimit] = useState(75);
 
   // Filter state
   const [showFilterPopup, setShowFilterPopup] = useState(false);
@@ -1041,6 +1041,21 @@ export function TeamsMentionsModal({
                           </div>
 
                           <p className='mention-text'>{mention.message_text}</p>
+
+                          {/* Merged message indicator */}
+                          {mention.is_merged && mention.message_count && mention.message_count > 1 && (
+                            <div className='merged-indicator'>
+                              <span className='merged-badge'>
+                                <MessageSquare size={12} />
+                                {mention.message_count} messages merged
+                              </span>
+                              {mention.timestamp_start && mention.timestamp_end && (
+                                <span className='merged-time-range'>
+                                  {formatTimestamp(mention.timestamp_start)} - {formatTimestamp(mention.timestamp_end)}
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           {/* Additional metadata row */}
                           <div className='mention-footer'>

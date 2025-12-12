@@ -9,6 +9,7 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
 from app.core.config import settings
+from app.utils.message_merger import MessageMerger, MessageMergerConfig
 
 
 class TeamsMention(BaseModel):
@@ -31,6 +32,13 @@ class TeamsMention(BaseModel):
     graph_metadata: Optional[dict] = None
     # Status field
     status: Optional[str] = "Open"  # 'Open', 'In Progress', 'Done'
+    # Message merging fields
+    is_merged: Optional[bool] = False
+    message_count: Optional[int] = 1
+    original_message_ids: Optional[List[str]] = None
+    timestamp_start: Optional[datetime] = None
+    timestamp_end: Optional[datetime] = None
+    merged_text: Optional[str] = None
 
 
 class TeamsServiceError(Exception):
@@ -55,11 +63,45 @@ class TeamsService:
         self.tenant_id = settings.MS_GRAPH_TENANT_ID
         self._access_token: Optional[str] = None
         self._token_expires: Optional[datetime] = None
+        # Initialize message merger with configuration from settings
+        self.message_merger = MessageMerger(MessageMergerConfig(
+            time_window_seconds=settings.MESSAGE_MERGE_TIME_WINDOW_SECONDS,
+            enable_merging=settings.MESSAGE_MERGE_ENABLED,
+            merge_same_chat_only=settings.MESSAGE_MERGE_SAME_CHAT_ONLY,
+            preserve_line_breaks=True
+        ))
 
     @property
     def is_configured(self) -> bool:
         """Check if the service is properly configured."""
         return bool(self.client_id and self.client_secret and self.tenant_id)
+
+    def _apply_message_merging(self, mentions: List[TeamsMention]) -> List[TeamsMention]:
+        """
+        Apply message merging to a list of mentions.
+
+        Args:
+            mentions: List of TeamsMention objects
+
+        Returns:
+            List of TeamsMention objects with sequential messages merged
+        """
+        if not mentions or len(mentions) <= 1:
+            return mentions
+
+        # Convert TeamsMention objects to dictionaries for merger
+        mention_dicts = [m.model_dump() for m in mentions]
+
+        # Apply merging
+        merged_dicts = self.message_merger.merge_teams_mentions(mention_dicts)
+
+        # Convert back to TeamsMention objects
+        merged_mentions = []
+        for merged_dict in merged_dicts:
+            # Create TeamsMention from merged data
+            merged_mentions.append(TeamsMention(**merged_dict))
+
+        return merged_mentions
 
     async def _get_access_token(self) -> str:
         """
@@ -172,9 +214,11 @@ class TeamsService:
                             body = msg.get("body", {})
                             content = body.get("content", "")
 
-                            # Strip HTML tags for clean text
+                            # Strip HTML tags and decode HTML entities for clean text
                             import re
-                            clean_text = re.sub(r'<[^>]+>', '', content).strip()
+                            import html
+                            clean_text = re.sub(r'<[^>]+>', '', content)
+                            clean_text = html.unescape(clean_text).strip()
 
                             sender = msg.get("from", {})
                             user_info = sender.get("user", {}) or sender.get("application", {})
@@ -237,7 +281,9 @@ class TeamsService:
                                     body = msg.get("body", {})
                                     content = body.get("content", "")
                                     import re
-                                    clean_text = re.sub(r'<[^>]+>', '', content).strip()
+                                    import html
+                                    clean_text = re.sub(r'<[^>]+>', '', content)
+                                    clean_text = html.unescape(clean_text).strip()
 
                                     sender = msg.get("from", {})
                                     user_info = sender.get("user", {}) or {}
@@ -270,6 +316,9 @@ class TeamsService:
     def _get_mock_mentions(self, limit: int = 5) -> List[TeamsMention]:
         """
         Return mock mentions for development/demo purposes.
+
+        Includes some sequential messages from the same user to demonstrate
+        message merging functionality.
         """
         from datetime import timedelta
 
@@ -368,9 +417,77 @@ class TeamsService:
                 graph_metadata={"chatType": "meeting", "meetingId": "meeting-456"},
                 status="In Progress",
             ),
+            # Add sequential messages from Sarah Chen to test merging (within 10 seconds)
+            TeamsMention(
+                id="mock-7",
+                message_text="@You Also, I found a bug in the login flow.",
+                sender_name="Sarah Chen",
+                sender_email="sarah.chen@company.com",
+                chat_name="Dev Team",
+                timestamp=now - timedelta(hours=1, seconds=-3),  # 3 seconds after mock-1
+                is_from_channel=False,
+                chat_type="group",
+                chat_id="mock-chat-1",
+                requested_by="demo_user",
+                requested_at=now - timedelta(hours=1, seconds=-3),
+                graph_metadata={"chatType": "group", "memberCount": 5},
+                status="Open",
+            ),
+            TeamsMention(
+                id="mock-8",
+                message_text="@You It's related to the password reset feature we added last week.",
+                sender_name="Sarah Chen",
+                sender_email="sarah.chen@company.com",
+                chat_name="Dev Team",
+                timestamp=now - timedelta(hours=1, seconds=-7),  # 7 seconds after mock-1
+                is_from_channel=False,
+                chat_type="group",
+                chat_id="mock-chat-1",
+                requested_by="demo_user",
+                requested_at=now - timedelta(hours=1, seconds=-7),
+                graph_metadata={"chatType": "group", "memberCount": 5},
+                status="Open",
+            ),
+            # Add another set from Mike Johnson (different chat, should not merge with Sarah's)
+            TeamsMention(
+                id="mock-9",
+                message_text="@You Quick question about the deployment",
+                sender_name="Mike Johnson",
+                sender_email="mike.j@company.com",
+                channel_name="General",
+                team_name="Backend Team",
+                timestamp=now - timedelta(hours=2),
+                is_from_channel=True,
+                chat_type="group",
+                chat_id="mock-chat-7",
+                requested_by="demo_user",
+                requested_at=now - timedelta(hours=2),
+                graph_metadata={"chatType": "group", "isChannel": True},
+                status="Open",
+            ),
+            TeamsMention(
+                id="mock-10",
+                message_text="@You Should we use the staging environment first?",
+                sender_name="Mike Johnson",
+                sender_email="mike.j@company.com",
+                channel_name="General",
+                team_name="Backend Team",
+                timestamp=now - timedelta(hours=2, seconds=-5),  # 5 seconds later
+                is_from_channel=True,
+                chat_type="group",
+                chat_id="mock-chat-7",
+                requested_by="demo_user",
+                requested_at=now - timedelta(hours=2, seconds=-5),
+                graph_metadata={"chatType": "group", "isChannel": True},
+                status="Open",
+            ),
         ]
 
-        return mock_mentions[:limit]
+        # Apply message merging to mock data
+        result = mock_mentions[:limit]
+        merged_result = self._apply_message_merging(result)
+        print(f"[TEAMS MOCK] Generated {len(result)} messages, merged to {len(merged_result)}")
+        return merged_result
 
     async def get_my_mentions_with_token(self, access_token: str, limit: int = 5) -> List[TeamsMention]:
         """
@@ -512,7 +629,9 @@ class TeamsService:
 
                             body = msg.get("body", {})
                             content = body.get("content", "")
-                            clean_text = re.sub(r'<[^>]+>', '', content).strip()
+                            import html
+                            clean_text = re.sub(r'<[^>]+>', '', content)
+                            clean_text = html.unescape(clean_text).strip()
 
                             if not clean_text:
                                 continue
@@ -546,11 +665,17 @@ class TeamsService:
 
                             if len(mentions) >= limit:
                                 print(f"[TEAMS] Returning {len(mentions)} real messages from chats")
-                                return mentions
+                                # Apply message merging before returning
+                                merged_mentions = self._apply_message_merging(mentions)
+                                print(f"[TEAMS] After merging: {len(merged_mentions)} messages ({len(mentions)} original)")
+                                return merged_mentions
 
                     if mentions:
                         print(f"[TEAMS] Returning {len(mentions)} real messages from chats")
-                        return mentions[:limit]
+                        # Apply message merging before returning
+                        merged_mentions = self._apply_message_merging(mentions[:limit])
+                        print(f"[TEAMS] After merging: {len(merged_mentions)} messages ({len(mentions[:limit])} original)")
+                        return merged_mentions
                 else:
                     print(f"[TEAMS] Chats endpoint failed: {chats_response.status_code} - {chats_response.text}")
 
