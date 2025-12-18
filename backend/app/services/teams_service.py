@@ -46,6 +46,14 @@ class TeamsServiceError(Exception):
     pass
 
 
+def _sanitize_for_print(text: str) -> str:
+    """Sanitize text to prevent encoding issues when printing."""
+    try:
+        return text.encode('ascii', errors='replace').decode('ascii')
+    except Exception:
+        return "<<encoding error>>"
+
+
 class TeamsService:
     """
     Service for interacting with Microsoft Graph API to fetch Teams mentions.
@@ -686,8 +694,10 @@ class TeamsService:
         except TeamsServiceError:
             raise
         except Exception as e:
-            print(f"[TEAMS] Error fetching mentions with token: {e}")
-            raise TeamsServiceError(f"Failed to fetch mentions: {str(e)}")
+            # Sanitize error message to prevent encoding issues
+            error_str = _sanitize_for_print(str(e))
+            print(f"[TEAMS] Error fetching mentions with token: {error_str}")
+            raise TeamsServiceError(f"Failed to fetch mentions: {error_str}")
 
 
 # Singleton instance

@@ -203,12 +203,16 @@ async def get_mentions(
         )
 
     except TeamsServiceError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        # Ensure error message is safe for encoding
+        error_msg = str(e).encode('ascii', errors='replace').decode('ascii')
+        raise HTTPException(status_code=503, detail=error_msg)
     except Exception as e:
-        print(f"[TEAMS API] Error: {e}")
+        # Ensure error message is safe for encoding
+        error_msg = str(e).encode('ascii', errors='replace').decode('ascii')
+        print(f"[TEAMS API] Error: {error_msg}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to fetch Teams mentions. Please try again later."
+            detail=f"Failed to fetch mentions: {error_msg}"
         )
 
 
@@ -445,12 +449,16 @@ async def get_user_mentions(
         )
 
     except TeamsServiceError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        # Ensure error message is safe for encoding
+        error_msg = str(e).encode('ascii', errors='replace').decode('ascii')
+        raise HTTPException(status_code=503, detail=error_msg)
     except Exception as e:
-        print(f"[TEAMS API] Error: {e}")
+        # Ensure error message is safe for encoding
+        error_msg = str(e).encode('ascii', errors='replace').decode('ascii')
+        print(f"[TEAMS API] Error: {error_msg}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to fetch Teams mentions. Please try again later."
+            detail=f"Failed to fetch mentions: {error_msg}"
         )
 
 

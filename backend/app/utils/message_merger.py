@@ -9,6 +9,14 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 
 
+def _safe_print(text: str) -> str:
+    """Sanitize text for safe console printing (avoid charmap encoding errors)."""
+    try:
+        return text.encode('ascii', errors='replace').decode('ascii')
+    except Exception:
+        return "<<encoding error>>"
+
+
 class MergedMessage(BaseModel):
     """Represents a merged message from multiple consecutive messages."""
     sender_id: str
@@ -81,7 +89,7 @@ class MessageMerger:
         sender_id_2 = msg2.get("sender_id") or msg2.get("sender_email")
 
         if sender_id_1 != sender_id_2:
-            print(f"[MERGER] Different senders: {sender_id_1} != {sender_id_2}")
+            print(f"[MERGER] Different senders: {_safe_print(str(sender_id_1))} != {_safe_print(str(sender_id_2))}")
             return False
 
         # Check time window
@@ -124,7 +132,7 @@ class MessageMerger:
             print(f"[MERGER] Is system event")
             return False
 
-        print(f"[MERGER] ✓ Merging messages from {sender_id_1}, time_diff={time_diff}s")
+        print(f"[MERGER] OK Merging messages from {_safe_print(str(sender_id_1))}, time_diff={time_diff}s")
         return True
 
     def merge_messages(self, messages: List[dict]) -> List[dict]:

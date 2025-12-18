@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, List, GitBranch, Zap, Moon, Sun, Settings, Columns, Wand2, RefreshCw, Loader2, Trash2, AlertTriangle, Network, MessageSquare } from 'lucide-react';
+import { Plus, List, GitBranch, Zap, Moon, Sun, Settings, Columns, Wand2, RefreshCw, Loader2, Trash2, AlertTriangle, Network, MessageSquare, HelpCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { TaskList } from './TaskList';
 import { TaskDetailPanel } from './TaskDetailPanel';
 import { TaskGraphView } from './TaskGraphView';
@@ -10,6 +10,8 @@ import { ReminderPanel } from './ReminderPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { MessageAnalyzer } from './MessageAnalyzer';
 import { TeamsMentionsModal } from './TeamsMentionsModal';
+import { HelpAgentModal } from './HelpAgentModal';
+import { CalendarTab } from './CalendarTab';
 import { taskApi } from '../api/client';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
@@ -106,7 +108,9 @@ interface TaskDashboardProps {
 export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [view, setView] = useState<'list' | 'kanban' | 'graph' | 'visualize'>('kanban');
+  const [view, setView] = useState<'list' | 'kanban' | 'graph' | 'visualize' | 'calendar'>(() => {
+    return (localStorage.getItem('taskflow-selected-view') as any) || 'kanban';
+  });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [analyzerOpen, setAnalyzerOpen] = useState(false);
@@ -115,8 +119,14 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [teamsModalOpen, setTeamsModalOpen] = useState(false);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
   const { isDark, toggleTheme } = useTheme();
-  const { userName, greeting } = useUser();
+  const { userName, greeting} = useUser();
+
+  // Persist view selection
+  useEffect(() => {
+    localStorage.setItem('taskflow-selected-view', view);
+  }, [view]);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -208,8 +218,9 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
 
   return (
     <div className="task-dashboard">
+      {/* Primary Header - Logo, Greeting, Add Tasks, Profile */}
       <motion.div
-        className="dashboard-header"
+        className="dashboard-header-primary"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
@@ -222,48 +233,107 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
             </div>
             <div className="logo-text">
               <h1 className="logo-title"><span className="greeting-text">{greeting},</span> {userName}</h1>
-              <span className="logo-subtitle">TaskFlow AI - Powered by Intelligence</span>
+              <span className="logo-subtitle">TaskFlow AI</span>
             </div>
           </div>
         </div>
 
-        {/* Center: Action Buttons */}
-        <div className="header-center">
-          <div className="action-group">
+        {/* Right: User Controls */}
+        <div className="header-right">
+          <ReminderPanel refreshTrigger={refreshTrigger} />
+
+          <motion.button
+            className="icon-btn theme-toggle"
+            onClick={toggleTheme}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            <AnimatePresence mode="wait">
+              {isDark ? (
+                <motion.span
+                  key="sun"
+                  initial={{ rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: 90, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Sun size={18} />
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="moon"
+                  initial={{ rotate: 90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: -90, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Moon size={18} />
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
+
+          <motion.button
+            id="settings-btn"
+            className="icon-btn settings-btn"
+            onClick={() => setSettingsOpen(true)}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title="Open settings"
+          >
+            <Settings size={18} />
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* Secondary Action Bar */}
+      <motion.div
+        className="dashboard-header-secondary"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
+        <div className="secondary-actions">
+          <div className="action-group-left">
             <motion.button
+              id="add-tasks-btn"
               onClick={onAddMore}
               className="header-btn primary-btn"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               title="Add new tasks"
             >
-              <Plus size={18} />
+              <Plus size={16} />
               <span>Add Tasks</span>
             </motion.button>
 
             <motion.button
+              id="teams-btn"
               onClick={() => setTeamsModalOpen(true)}
               className="header-btn teams-btn"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               title="Get your latest Teams mentions"
             >
-              <MessageSquare size={18} />
+              <MessageSquare size={16} />
               <span>Teams</span>
             </motion.button>
 
             <motion.button
+              id="analyze-btn"
               onClick={() => setAnalyzerOpen(true)}
               className="header-btn analyzer-btn"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               title="Analyze messy messages with AI"
             >
-              <Wand2 size={18} />
+              <Wand2 size={16} />
               <span>Analyze</span>
             </motion.button>
 
             <motion.button
+              id="improve-all-btn"
               onClick={handleReanalyze}
               className="header-btn reanalyze-btn"
               whileHover={{ scale: 1.02 }}
@@ -277,14 +347,16 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
                   transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                   style={{ display: 'flex' }}
                 >
-                  <Loader2 size={18} />
+                  <Loader2 size={16} />
                 </motion.span>
               ) : (
-                <RefreshCw size={18} />
+                <RefreshCw size={16} />
               )}
               <span>{isReanalyzing ? 'Improving...' : 'Improve'}</span>
             </motion.button>
+          </div>
 
+          <div className="action-group-right">
             <motion.button
               onClick={() => setDeleteAllModalOpen(true)}
               className="header-btn delete-btn"
@@ -293,92 +365,8 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
               disabled={tasks.length === 0}
               title="Delete all tasks"
             >
-              <Trash2 size={18} />
+              <Trash2 size={16} />
               <span>Delete All</span>
-            </motion.button>
-          </div>
-        </div>
-
-        {/* Right: View Controls & Settings */}
-        <div className="header-right">
-          <div className="view-toggle">
-            <button
-              className={view === 'list' ? 'active' : ''}
-              onClick={() => setView('list')}
-              title="View as list"
-            >
-              <List size={16} />
-              <span>List</span>
-            </button>
-            <button
-              className={view === 'kanban' ? 'active' : ''}
-              onClick={() => setView('kanban')}
-              title="View as Kanban board"
-            >
-              <Columns size={16} />
-              <span>Kanban</span>
-            </button>
-            <button
-              className={view === 'graph' ? 'active' : ''}
-              onClick={() => setView('graph')}
-              title="View as dependency graph"
-            >
-              <GitBranch size={16} />
-              <span>Graph</span>
-            </button>
-            <button
-              className={view === 'visualize' ? 'active' : ''}
-              onClick={() => setView('visualize')}
-              title="Flowchart & Tree visualization"
-            >
-              <Network size={16} />
-              <span>Visualize</span>
-            </button>
-          </div>
-
-          <div className="control-group">
-            <ReminderPanel refreshTrigger={refreshTrigger} />
-
-            <motion.button
-              className="icon-btn theme-toggle"
-              onClick={toggleTheme}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              <AnimatePresence mode="wait">
-                {isDark ? (
-                  <motion.span
-                    key="sun"
-                    initial={{ rotate: -90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Sun size={18} />
-                  </motion.span>
-                ) : (
-                  <motion.span
-                    key="moon"
-                    initial={{ rotate: 90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Moon size={18} />
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
-
-            <motion.button
-              className="icon-btn settings-btn"
-              onClick={() => setSettingsOpen(true)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title="Open settings"
-            >
-              <Settings size={18} />
             </motion.button>
           </div>
         </div>
@@ -405,6 +393,58 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
             </motion.div>
           )}
         </AnimatePresence>
+      </motion.div>
+
+      {/* View Switcher Section */}
+      <motion.div
+        className="dashboard-view-switcher"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
+        <div className="view-toggle-segmented">
+          <button
+            className={view === 'list' ? 'active' : ''}
+            onClick={() => setView('list')}
+            title="View as list"
+          >
+            <List size={16} />
+            <span>List</span>
+          </button>
+          <button
+            className={view === 'kanban' ? 'active' : ''}
+            onClick={() => setView('kanban')}
+            title="View as Kanban board"
+          >
+            <Columns size={16} />
+            <span>Kanban</span>
+          </button>
+          <button
+            className={view === 'graph' ? 'active' : ''}
+            onClick={() => setView('graph')}
+            title="View as dependency graph"
+          >
+            <GitBranch size={16} />
+            <span>Graph</span>
+          </button>
+          <button
+            className={view === 'visualize' ? 'active' : ''}
+            onClick={() => setView('visualize')}
+            title="Flowchart & Tree visualization"
+          >
+            <Network size={16} />
+            <span>Visualize</span>
+          </button>
+          <button
+            id="calendar-tab"
+            className={view === 'calendar' ? 'active' : ''}
+            onClick={() => setView('calendar')}
+            title="Calendar & Schedule view"
+          >
+            <CalendarIcon size={16} />
+            <span>Calendar</span>
+          </button>
+        </div>
       </motion.div>
 
       <div className="dashboard-content">
@@ -476,6 +516,23 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
                 />
               </motion.div>
             )}
+            {view === 'calendar' && (
+              <motion.div
+                key="calendar"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.2 }}
+                style={{ height: '100%' }}
+              >
+                <CalendarTab
+                  tasks={tasks}
+                  refreshTrigger={refreshTrigger}
+                  onTaskUpdated={handleTaskUpdated}
+                  onTaskDeleted={handleTaskDeleted}
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
         </motion.div>
 
@@ -486,6 +543,7 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 50 }}
               transition={{ duration: 0.2 }}
+              style={{ height: '100%', flexShrink: 0 }}
             >
               <TaskDetailPanel
                 task={selectedTask}
@@ -524,6 +582,29 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
         onClose={() => setTeamsModalOpen(false)}
         onTasksCreated={handleTaskUpdated}
       />
+
+      {/* Floating Help Widget - Bottom Right */}
+      <HelpAgentModal
+        isOpen={helpModalOpen}
+        onClose={() => setHelpModalOpen(false)}
+      />
+
+      {/* Floating Help Button - Bottom Right */}
+      {!helpModalOpen && (
+        <motion.button
+          id="help-fab"
+          className="help-fab"
+          onClick={() => setHelpModalOpen(true)}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.5 }}
+          title="AI Help Assistant"
+        >
+          <HelpCircle size={24} />
+        </motion.button>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import type {
   ReanalyzeResponse,
   TeamsMentionsResponse,
   TeamsStatusResponse,
+  HelpAgentResponse,
 } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -228,6 +229,97 @@ export const teamsApi = {
       params,
     });
     return response.data;
+  },
+};
+
+export const helpApi = {
+  ask: async (query: string): Promise<HelpAgentResponse> => {
+    const response = await api.post<HelpAgentResponse>('/help/ask', {
+      query,
+    });
+    return response.data;
+  },
+};
+
+export interface CalendarEventData {
+  id: string;
+  subject: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+  status: string;
+  type: string;
+  organizer?: string;
+  location?: string;
+  webLink?: string;
+  body?: string;
+  isCancelled: boolean;
+  taskId?: number | null;
+}
+
+export interface CalendarEventResponse {
+  events: CalendarEventData[];
+  count: number;
+}
+
+export interface FreeBusyTimeSlot {
+  start: string;
+  end: string;
+  status: string;
+}
+
+export interface FreeBusyResponse {
+  time_slots: FreeBusyTimeSlot[];
+}
+
+export const calendarApi = {
+  getEvents: async (accessToken: string, startDate: string, endDate: string): Promise<CalendarEventResponse> => {
+    const response = await api.get<CalendarEventResponse>('/calendar/events', {
+      params: {
+        access_token: accessToken,
+        start_date: startDate,
+        end_date: endDate,
+      },
+    });
+    return response.data;
+  },
+
+  createEvent: async (
+    accessToken: string,
+    event: {
+      subject: string;
+      start: string;
+      end: string;
+      body?: string;
+      location?: string;
+      task_id?: number;
+    }
+  ): Promise<CalendarEventData> => {
+    const response = await api.post<CalendarEventData>('/calendar/events', event, {
+      params: {
+        access_token: accessToken,
+      },
+    });
+    return response.data;
+  },
+
+  getFreeBusy: async (accessToken: string, startDate: string, endDate: string): Promise<FreeBusyResponse> => {
+    const response = await api.get<FreeBusyResponse>('/calendar/freebusy', {
+      params: {
+        access_token: accessToken,
+        start_date: startDate,
+        end_date: endDate,
+      },
+    });
+    return response.data;
+  },
+
+  deleteEvent: async (accessToken: string, eventId: string): Promise<void> => {
+    await api.delete(`/calendar/events/${eventId}`, {
+      params: {
+        access_token: accessToken,
+      },
+    });
   },
 };
 

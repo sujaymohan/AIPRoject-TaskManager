@@ -17,6 +17,7 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [snoozing, setSnoozing] = useState<Set<number>>(new Set());
   const notifiedIds = useRef<Set<number>>(new Set());
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -73,30 +74,43 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
       setReminders(pending);
 
       // Check for new notifications and trigger browser notifications
-      if (notifs.length > 0) {
-        notifs.forEach(notif => {
-          if (!notifications.find(n => n.id === notif.id)) {
-            // New notification appeared, show browser notification
-            showBrowserNotification(notif);
-          }
-        });
-      }
-
-      setNotifications(notifs);
+      setNotifications(prev => {
+        if (notifs.length > 0) {
+          notifs.forEach(notif => {
+            if (!prev.find(n => n.id === notif.id)) {
+              // New notification appeared, show browser notification
+              showBrowserNotification(notif);
+            }
+          });
+        }
+        return notifs;
+      });
     } catch (err) {
       console.error('Failed to fetch reminders:', err);
     } finally {
       setLoading(false);
     }
-  }, [notifications, showBrowserNotification]);
+  }, [showBrowserNotification]);
 
   useEffect(() => {
+    // Clear any existing interval to prevent stacking
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
     fetchReminders();
 
-    // Poll for notifications every 15 seconds (more responsive than 30)
-    const interval = setInterval(fetchReminders, 15000);
-    return () => clearInterval(interval);
-  }, [fetchReminders, refreshTrigger]);
+    // Poll for notifications every 60 seconds (balanced between responsiveness and server load)
+    pollingIntervalRef.current = setInterval(fetchReminders, 60000);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [refreshTrigger]); // Removed fetchReminders from dependencies to prevent interval stacking
 
   const handleDismiss = async (id: number) => {
     try {

@@ -85,10 +85,21 @@ export function TeamsMentionsModal({
           setSelectedMentions(new Set(response.mentions.map((m) => m.id)));
           setLoading(false);
           return;
-        } catch (tokenErr) {
-          // Token might be expired, clear it and try OAuth again
-          console.warn("Access token invalid or expired, initiating OAuth...");
-          localStorage.removeItem("teams_access_token");
+        } catch (tokenErr: any) {
+          // Check if it's an authentication error (401/403) vs other errors
+          const status = tokenErr?.response?.status;
+          if (status === 401 || status === 403) {
+            // Token expired or invalid, clear it and try OAuth again
+            console.warn("Access token invalid or expired, initiating OAuth...");
+            localStorage.removeItem("teams_access_token");
+          } else {
+            // Other error (500, 503, network error, etc.) - don't clear token, just show error
+            console.error("API error fetching mentions:", tokenErr);
+            const errorMsg = tokenErr?.response?.data?.detail || tokenErr?.message || "Server error";
+            setError(`Failed to fetch mentions: ${errorMsg}`);
+            setLoading(false);
+            return;
+          }
         }
       }
 
@@ -190,7 +201,7 @@ export function TeamsMentionsModal({
       setError(null);
       setProcessSuccess(false);
     }
-  }, [isOpen, fetchMentions]);
+  }, [isOpen]); // Removed fetchMentions from deps to prevent re-triggering OAuth flow
 
   const toggleMention = useCallback((id: string) => {
     setSelectedMentions((prev) => {

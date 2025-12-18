@@ -18,7 +18,15 @@
       "Bash(taskkill:*)",
       "Bash(taskkill //F //PID 7848)",
       "Bash(./venv/Scripts/python.exe -m uvicorn:*)",
-      "Bash(.venvScriptspython.exe -m uvicorn app.main:app --reload --port 8000)"
+      "Bash(.venvScriptspython.exe -m uvicorn app.main:app --reload --port 8000)",
+      "Bash(venvScriptspython.exe -m uvicorn app.main:app --reload)",
+      "Bash(venv/Scripts/python.exe:*)",
+      "Bash(wmic process where \"ProcessId=13904 or ProcessId=59996 or ProcessId=50172\" get Name,ProcessId,CommandLine)",
+      "Bash(tasklist:*)",
+      "Bash(backend/venv/Scripts/python.exe -m pip install:*)",
+      "Bash(backend/venv/Scripts/python.exe:*)",
+      "Bash(../backend/venv/Scripts/python.exe:*)",
+      "Bash(timeout /t 1)"
     ],
     "deny": [],
     "ask": []

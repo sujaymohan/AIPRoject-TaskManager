@@ -9,3 +9,4 @@ export { ReminderPanel } from './ReminderPanel';
 export { OnboardingPage } from './OnboardingPage';
 export { SettingsPanel } from './SettingsPanel';
 export { TeamsMentionsModal } from './TeamsMentionsModal';
+export { HelpAgentModal } from './HelpAgentModal';

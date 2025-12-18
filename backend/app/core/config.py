@@ -4,6 +4,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./taskmap.db"
     GOOGLE_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    XAI_API_KEY: str = ""
 
     # Microsoft Graph API credentials for Teams integration
     MS_GRAPH_CLIENT_ID: str = ""

@@ -40,6 +40,8 @@ export interface Task {
   updated_at: string;
   reminders: Reminder[];
   depends_on: number[];
+  // Calendar integration
+  calendar_event_id?: string | null;
 }
 
 export interface TaskParseResponse {
@@ -199,4 +201,61 @@ export interface TeamsMentionsResponse {
 export interface TeamsStatusResponse {
   is_configured: boolean;
   message: string;
+}
+
+// Help Agent types
+export type MachineActionType = 'move' | 'click' | 'input' | 'type' | 'wait' | 'open' | 'scroll' | 'tooltip';
+
+export interface MachineAction {
+  action: MachineActionType;
+  selector: string;
+  message?: string;
+  value?: string;
+  delay?: number;
+}
+
+export interface HelpAgentResponse {
+  human_guide: string;
+  machine_actions: MachineAction[];
+  query: string;
+}
+
+// Calendar Integration types
+export type EventStatus = 'free' | 'tentative' | 'busy' | 'oof' | 'working_elsewhere';
+export type EventType = 'singleInstance' | 'occurrence' | 'exception' | 'seriesMaster';
+
+export interface CalendarEvent {
+  id: string;
+  subject: string;
+  start: string; // ISO datetime
+  end: string; // ISO datetime
+  isAllDay: boolean;
+  status: EventStatus;
+  type: EventType;
+  organizer?: string;
+  location?: string;
+  webLink?: string;
+  body?: string;
+  isCancelled: boolean;
+  // Link to task if created from a task
+  taskId?: number;
+}
+
+export interface FreeBusyTimeSlot {
+  start: string;
+  end: string;
+  status: EventStatus;
+}
+
+export interface ScheduleSuggestion {
+  start: string;
+  end: string;
+  score: number; // 0-100, higher is better
+  reason: string;
+}
+
+export interface CalendarTaskLink {
+  taskId: number;
+  eventId: string;
+  createdAt: string;
 }
