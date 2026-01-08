@@ -307,7 +307,9 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
               <Plus size={16} />
               <span>Add Tasks</span>
             </motion.button>
+          </div>
 
+          <div className="action-group-right">
             <motion.button
               id="teams-btn"
               onClick={() => setTeamsModalOpen(true)}
@@ -354,9 +356,7 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
               )}
               <span>{isReanalyzing ? 'Improving...' : 'Improve'}</span>
             </motion.button>
-          </div>
 
-          <div className="action-group-right">
             <motion.button
               onClick={() => setDeleteAllModalOpen(true)}
               className="header-btn delete-btn"
@@ -404,6 +404,7 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
       >
         <div className="view-toggle-segmented">
           <button
+            id="list-view-btn"
             className={view === 'list' ? 'active' : ''}
             onClick={() => setView('list')}
             title="View as list"
@@ -412,6 +413,7 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
             <span>List</span>
           </button>
           <button
+            id="kanban-view-btn"
             className={view === 'kanban' ? 'active' : ''}
             onClick={() => setView('kanban')}
             title="View as Kanban board"
@@ -420,6 +422,7 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
             <span>Kanban</span>
           </button>
           <button
+            id="graph-view-btn"
             className={view === 'graph' ? 'active' : ''}
             onClick={() => setView('graph')}
             title="View as dependency graph"
@@ -428,6 +431,7 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
             <span>Graph</span>
           </button>
           <button
+            id="visualize-view-btn"
             className={view === 'visualize' ? 'active' : ''}
             onClick={() => setView('visualize')}
             title="Flowchart & Tree visualization"
@@ -436,7 +440,7 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
             <span>Visualize</span>
           </button>
           <button
-            id="calendar-tab"
+            id="calendar-view-btn"
             className={view === 'calendar' ? 'active' : ''}
             onClick={() => setView('calendar')}
             title="Calendar & Schedule view"

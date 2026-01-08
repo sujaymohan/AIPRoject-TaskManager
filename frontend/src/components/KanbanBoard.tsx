@@ -305,6 +305,8 @@ function SortableTaskCard({ task, onDelete, onViewDetails }: SortableTaskCardPro
     <motion.div
       ref={setNodeRef}
       style={style}
+      id={`task-card-${task.id}`}
+      data-task-id={task.id}
       className={`kanban-task-card ${isDragging ? 'dragging' : ''}`}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: isDragging ? 0.5 : 1, y: 0 }}
@@ -439,6 +441,7 @@ function DroppableColumn({ column, tasks, onDelete, onViewDetails }: DroppableCo
 
   return (
     <div
+      id={`kanban-column-${column.id}`}
       className={`kanban-column ${isOver ? 'drop-target' : ''}`}
       style={{ '--column-color': column.color, '--column-bg': column.bgColor } as React.CSSProperties}
     >

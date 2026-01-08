@@ -855,14 +855,15 @@ input::placeholder, textarea::placeholder {
   transform: translateY(-1px);
 }
 
-/* Delete Button */
-.delete-btn {
+/* Delete Button in Header */
+.header-btn.delete-btn {
   background: #ef4444;
   color: white;
+  border: none;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
 }
 
-.delete-btn:hover:not(:disabled) {
+.header-btn.delete-btn:hover:not(:disabled) {
   background: #dc2626;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
   transform: translateY(-1px);

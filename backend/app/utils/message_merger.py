@@ -43,7 +43,7 @@ class MergedMessage(BaseModel):
 
 class MessageMergerConfig(BaseModel):
     """Configuration for message merging behavior."""
-    time_window_seconds: int = 10  # Messages within 10 seconds are candidates for merging
+    time_window_seconds: int = 300  # Messages within 5 minutes are candidates for merging
     enable_merging: bool = True
     merge_same_chat_only: bool = True  # Only merge messages from same chat/channel
     preserve_line_breaks: bool = True  # Add line breaks between merged messages

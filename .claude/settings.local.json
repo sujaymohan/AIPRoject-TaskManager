@@ -26,7 +26,13 @@
       "Bash(backend/venv/Scripts/python.exe -m pip install:*)",
       "Bash(backend/venv/Scripts/python.exe:*)",
       "Bash(../backend/venv/Scripts/python.exe:*)",
-      "Bash(timeout /t 1)"
+      "Bash(timeout /t 1)",
+      "Bash(timeout /t 3)",
+      "Bash(cat:*)",
+      "Bash(pip install:*)",
+      "Bash(powershell -Command \"Stop-Process -Id 41940 -Force; Stop-Process -Id 33436 -Force\")",
+      "Bash(source venv/Scripts/activate)",
+      "Bash(uvicorn:*)"
     ],
     "deny": [],
     "ask": []

@@ -9,6 +9,122 @@ export interface AutomationState {
 
 export type AutomationCallback = (state: AutomationState) => void;
 
+// Allowed selectors that exist in the app - used for client-side validation
+const ALLOWED_SELECTOR_PREFIXES = [
+  // Header action buttons
+  '#add-tasks-btn',
+  '#teams-btn',
+  '#analyze-btn',
+  '#improve-all-btn',
+  '#settings-btn',
+  '#help-fab',
+
+  // View switcher buttons
+  '#kanban-view-btn',
+  '#list-view-btn',
+  '#graph-view-btn',
+  '#visualize-view-btn',
+  '#calendar-view-btn',
+
+  // Kanban board
+  '#kanban-column-todo',
+  '#kanban-column-in_progress',
+  '#kanban-column-done',
+  '.kanban-task-card',
+  '.kanban-column',
+  '.kanban-modal',
+  '[data-task-id',
+  '#task-card-',
+
+  // Teams modal
+  '.teams-modal',
+  '.demo-data-btn',
+  '.teams-mentions-list',
+  '.teams-mention-item',
+  '.mention-checkbox',
+  '.teams-process-btn',
+  '.teams-cancel-btn',
+  '.teams-filter-popup',
+  '.teams-selection-controls',
+  '#mention-limit',
+
+  // Help agent modal
+  '.help-agent-modal',
+  '.quick-question-btn',
+  '.run-automation-btn',
+  '.send-btn',
+  '.modal-header',
+  '.modal-body',
+  '.modal-footer',
+
+  // Message analyzer
+  '.analyzer-modal',
+  '.analyzer-input-section',
+  '.analyzer-content',
+  '.clear-btn',
+
+  // Task paste area
+  '.task-paste-area',
+  '.primary-btn',
+
+  // Settings panel
+  '.settings-panel',
+
+  // Reminder panel
+  '.reminder-panel',
+  '.reminder-header',
+  '.reminder-content',
+
+  // Task detail panel
+  '.task-detail-panel',
+  '.task-detail-modal',
+  '.task-detail-content',
+
+  // Delete all modal
+  '.delete-all-modal',
+
+  // Common elements
+  '.close-btn',
+  '.modal-overlay',
+  '.delete-btn',
+  '.header-btn',
+  '.icon-btn',
+  '.theme-toggle',
+  '.view-toggle-segmented',
+];
+
+// Patterns that indicate AI hallucination - these selectors do not exist
+const FORBIDDEN_PATTERNS = [
+  '.status-option',
+  '.dropdown',
+  'select',
+  '.status-select',
+  '.status-btn',
+  '.change-status',
+];
+
+function isSelectorAllowed(selector: string): boolean {
+  const selectorLower = selector.toLowerCase();
+
+  // Check for forbidden patterns
+  for (const pattern of FORBIDDEN_PATTERNS) {
+    if (selectorLower.includes(pattern)) {
+      console.warn(`[UI_AUTOMATION] Blocked forbidden selector pattern: ${selector}`);
+      return false;
+    }
+  }
+
+  // Check if selector starts with any allowed prefix
+  for (const prefix of ALLOWED_SELECTOR_PREFIXES) {
+    if (selector.startsWith(prefix)) {
+      return true;
+    }
+  }
+
+  console.warn(`[UI_AUTOMATION] Selector not in allowed list: ${selector}`);
+  return false;
+}
+
 class UIAutomationEngine {
   private isRunning = false;
   private currentElement: HTMLElement | null = null;
@@ -25,17 +141,30 @@ class UIAutomationEngine {
       throw new Error('Automation already running');
     }
 
+    // Filter out actions with invalid selectors before execution
+    const validActions = actions.filter((action) => {
+      // Skip validation for 'wait' actions without specific selectors
+      if (action.action === 'wait' && !action.selector) {
+        return true;
+      }
+      return isSelectorAllowed(action.selector);
+    });
+
+    if (validActions.length === 0 && actions.length > 0) {
+      console.warn('[UI_AUTOMATION] All actions filtered out due to invalid selectors');
+    }
+
     this.isRunning = true;
     this.createOverlayElements();
 
     try {
-      for (let i = 0; i < actions.length; i++) {
-        const action = actions[i];
+      for (let i = 0; i < validActions.length; i++) {
+        const action = validActions[i];
 
         if (onProgress) {
           onProgress({
             currentStep: i + 1,
-            totalSteps: actions.length,
+            totalSteps: validActions.length,
             isRunning: true,
             currentMessage: action.message,
           });
@@ -49,8 +178,8 @@ class UIAutomationEngine {
 
       if (onProgress) {
         onProgress({
-          currentStep: actions.length,
-          totalSteps: actions.length,
+          currentStep: validActions.length,
+          totalSteps: validActions.length,
           isRunning: false,
         });
       }

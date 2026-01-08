@@ -19,10 +19,10 @@ export function HelpAgentModal({ isOpen, onClose }: HelpAgentModalProps) {
 
   const quickQuestions = [
     'How do I add tasks?',
+    'How do I change task status?',
     'Show me how to connect Teams',
     'How do I view the dependency graph?',
     'How do I set a reminder?',
-    'How do I improve my tasks?',
     'How do I analyze a message?',
   ];
 
