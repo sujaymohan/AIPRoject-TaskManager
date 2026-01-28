@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import engine, Base
-from app.routes import tasks_router, reminders_router, graph_router, teams_router, help_router, calendar_router, quota_router
+from app.routes import tasks_router, reminders_router, graph_router, teams_router, help_router, calendar_router, quota_router, help_automation_router
 from app.services.scheduler import start_scheduler, stop_scheduler
 # Import models to ensure they're registered with Base
 from app.models.quota import AIQuotaUsage, QuotaAlert  # noqa: F401
@@ -53,6 +53,7 @@ app.include_router(teams_router)
 app.include_router(help_router)
 app.include_router(calendar_router)
 app.include_router(quota_router)
+app.include_router(help_automation_router)
 
 
 @app.get("/")

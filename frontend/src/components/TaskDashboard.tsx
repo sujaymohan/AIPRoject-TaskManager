@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, List, GitBranch, Zap, Moon, Sun, Settings, Columns, Wand2, RefreshCw, Loader2, Trash2, AlertTriangle, Network, MessageSquare, HelpCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, List, GitBranch, Zap, Moon, Sun, Settings, Columns, Wand2, RefreshCw, Loader2, Trash2, AlertTriangle, Network, MessageSquare, HelpCircle, Calendar as CalendarIcon, Circle } from 'lucide-react';
 import { TaskList } from './TaskList';
 import { TaskDetailPanel } from './TaskDetailPanel';
 import { TaskGraphView } from './TaskGraphView';
@@ -13,9 +13,11 @@ import { TeamsMentionsModal } from './TeamsMentionsModal';
 import { HelpAgentModal } from './HelpAgentModal';
 import { CalendarTab } from './CalendarTab';
 import { AIQuotaStatus } from './AIQuotaStatus';
+import { HelpRecorderPanel } from './HelpRecorderPanel';
 import { taskApi } from '../api/client';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
+import { useHelpRecorderContext } from '../contexts/HelpRecorderContext';
 import type { Task, ReanalyzeResponse } from '../types';
 
 // Delete All Confirmation Modal Component
@@ -121,8 +123,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [teamsModalOpen, setTeamsModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
+  const [recorderPanelOpen, setRecorderPanelOpen] = useState(false);
   const { isDark, toggleTheme } = useTheme();
   const { userName, greeting} = useUser();
+  const { isRecording, recordButtonClick, recordViewChange } = useHelpRecorderContext();
 
   // Persist view selection
   useEffect(() => {
@@ -247,7 +251,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
 
           <motion.button
             className="icon-btn theme-toggle"
-            onClick={toggleTheme}
+            onClick={() => {
+              recordButtonClick('Toggle Theme', { selector: '.theme-toggle' });
+              toggleTheme();
+            }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -280,7 +287,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
           <motion.button
             id="settings-btn"
             className="icon-btn settings-btn"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => {
+              recordButtonClick('Settings', { selector: '#settings-btn' });
+              setSettingsOpen(true);
+            }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             title="Open settings"
@@ -301,7 +311,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
           <div className="action-group-left">
             <motion.button
               id="add-tasks-btn"
-              onClick={onAddMore}
+              onClick={() => {
+                recordButtonClick('Add Tasks', { selector: '#add-tasks-btn' });
+                onAddMore();
+              }}
               className="header-btn primary-btn"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -315,7 +328,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
           <div className="action-group-right">
             <motion.button
               id="teams-btn"
-              onClick={() => setTeamsModalOpen(true)}
+              onClick={() => {
+                recordButtonClick('Teams', { selector: '#teams-btn' });
+                setTeamsModalOpen(true);
+              }}
               className="header-btn teams-btn"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -326,8 +342,26 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
             </motion.button>
 
             <motion.button
+              id="recorder-btn"
+              onClick={() => {
+                recordButtonClick('Record Help Flow', { selector: '#recorder-btn' });
+                setRecorderPanelOpen(true);
+              }}
+              className={`header-btn ${isRecording ? 'recording-active' : ''}`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              title="Record help flow"
+            >
+              <Circle size={16} className={isRecording ? 'animate-pulse text-red-500' : ''} />
+              <span>{isRecording ? 'Recording...' : 'Record'}</span>
+            </motion.button>
+
+            <motion.button
               id="analyze-btn"
-              onClick={() => setAnalyzerOpen(true)}
+              onClick={() => {
+                recordButtonClick('Analyze', { selector: '#analyze-btn' });
+                setAnalyzerOpen(true);
+              }}
               className="header-btn analyzer-btn"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -339,7 +373,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
 
             <motion.button
               id="improve-all-btn"
-              onClick={handleReanalyze}
+              onClick={() => {
+                recordButtonClick('Improve All', { selector: '#improve-all-btn' });
+                handleReanalyze();
+              }}
               className="header-btn reanalyze-btn"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -361,7 +398,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
             </motion.button>
 
             <motion.button
-              onClick={() => setDeleteAllModalOpen(true)}
+              onClick={() => {
+                recordButtonClick('Delete All', { selector: '.delete-btn' });
+                setDeleteAllModalOpen(true);
+              }}
               className="header-btn delete-btn"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -409,7 +449,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
           <button
             id="list-view-btn"
             className={view === 'list' ? 'active' : ''}
-            onClick={() => setView('list')}
+            onClick={() => {
+              recordViewChange('List View', { selector: '#list-view-btn' });
+              setView('list');
+            }}
             title="View as list"
           >
             <List size={16} />
@@ -418,7 +461,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
           <button
             id="kanban-view-btn"
             className={view === 'kanban' ? 'active' : ''}
-            onClick={() => setView('kanban')}
+            onClick={() => {
+              recordViewChange('Kanban View', { selector: '#kanban-view-btn' });
+              setView('kanban');
+            }}
             title="View as Kanban board"
           >
             <Columns size={16} />
@@ -427,7 +473,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
           <button
             id="graph-view-btn"
             className={view === 'graph' ? 'active' : ''}
-            onClick={() => setView('graph')}
+            onClick={() => {
+              recordViewChange('Graph View', { selector: '#graph-view-btn' });
+              setView('graph');
+            }}
             title="View as dependency graph"
           >
             <GitBranch size={16} />
@@ -436,7 +485,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
           <button
             id="visualize-view-btn"
             className={view === 'visualize' ? 'active' : ''}
-            onClick={() => setView('visualize')}
+            onClick={() => {
+              recordViewChange('Visualize View', { selector: '#visualize-view-btn' });
+              setView('visualize');
+            }}
             title="Flowchart & Tree visualization"
           >
             <Network size={16} />
@@ -445,7 +497,10 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
           <button
             id="calendar-view-btn"
             className={view === 'calendar' ? 'active' : ''}
-            onClick={() => setView('calendar')}
+            onClick={() => {
+              recordViewChange('Calendar View', { selector: '#calendar-view-btn' });
+              setView('calendar');
+            }}
             title="Calendar & Schedule view"
           >
             <CalendarIcon size={16} />
@@ -589,6 +644,11 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
         onClose={() => setTeamsModalOpen(false)}
         onTasksCreated={handleTaskUpdated}
       />
+
+      {/* Help Recorder Panel */}
+      {recorderPanelOpen && (
+        <HelpRecorderPanel onClose={() => setRecorderPanelOpen(false)} />
+      )}
 
       {/* Floating Help Widget - Bottom Right */}
       <HelpAgentModal

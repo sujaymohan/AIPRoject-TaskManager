@@ -11,6 +11,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import type { Task, TaskCategory } from '../types';
+import { useHelpRecorderContext } from '../contexts/HelpRecorderContext';
 
 interface TaskListProps {
   tasks: Task[];
@@ -43,6 +44,8 @@ const itemVariants = {
 };
 
 export function TaskList({ tasks, selectedTaskId, onSelectTask }: TaskListProps) {
+  const { recordButtonClick } = useHelpRecorderContext();
+
   if (tasks.length === 0) {
     return (
       <motion.div
@@ -80,7 +83,14 @@ export function TaskList({ tasks, selectedTaskId, onSelectTask }: TaskListProps)
             <motion.div
               key={task.id}
               className={`task-item ${selectedTaskId === task.id ? 'selected' : ''}`}
-              onClick={() => onSelectTask(task)}
+              onClick={() => {
+                recordButtonClick(`Task: ${task.clean_text}`, {
+                  taskId: task.id,
+                  category: task.category,
+                  status: task.status
+                });
+                onSelectTask(task);
+              }}
               variants={itemVariants}
               whileHover={{ backgroundColor: 'var(--bg-hover)' }}
               whileTap={{ scale: 0.995 }}

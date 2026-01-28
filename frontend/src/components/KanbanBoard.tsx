@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import { taskApi } from '../api/client';
 import type { Task, TaskStatus, TaskCategory, TaskPriority } from '../types';
+import { useHelpRecorderContext } from '../contexts/HelpRecorderContext';
 
 interface KanbanBoardProps {
   refreshTrigger: number;
@@ -261,6 +262,7 @@ interface SortableTaskCardProps {
 }
 
 function SortableTaskCard({ task, onDelete, onViewDetails }: SortableTaskCardProps) {
+  const { recordButtonClick } = useHelpRecorderContext();
   const {
     attributes,
     listeners,
@@ -290,13 +292,23 @@ function SortableTaskCard({ task, onDelete, onViewDetails }: SortableTaskCardPro
 
     if (clickCount.current === 1) {
       clickTimer.current = setTimeout(() => {
-        // Single click - show details panel (for now, same as double click)
+        // Single click - record it
+        recordButtonClick(`Kanban Card: ${task.clean_text}`, {
+          taskId: task.id,
+          category: task.category,
+          status: task.status,
+          column: task.status
+        });
         clickCount.current = 0;
       }, 250);
     } else if (clickCount.current === 2) {
       // Double click - open modal
       if (clickTimer.current) clearTimeout(clickTimer.current);
       clickCount.current = 0;
+      recordButtonClick(`Open Task Details: ${task.clean_text}`, {
+        taskId: task.id,
+        action: 'double-click-details'
+      });
       onViewDetails(task);
     }
   };
@@ -367,6 +379,10 @@ function SortableTaskCard({ task, onDelete, onViewDetails }: SortableTaskCardPro
           className="card-delete-btn"
           onClick={(e) => {
             e.stopPropagation();
+            recordButtonClick(`Delete Task: ${task.clean_text}`, {
+              taskId: task.id,
+              action: 'delete'
+            });
             onDelete(task.id);
           }}
           title="Delete task"
@@ -487,6 +503,7 @@ function DroppableColumn({ column, tasks, onDelete, onViewDetails }: DroppableCo
 
 // Main Kanban Board Component
 export function KanbanBoard({ refreshTrigger, onTaskDeleted }: KanbanBoardProps) {
+  const { recordStep } = useHelpRecorderContext();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -620,6 +637,17 @@ export function KanbanBoard({ refreshTrigger, onTaskDeleted }: KanbanBoardProps)
       if (overTask) {
         newStatus = overTask.status;
       }
+    }
+
+    // Record the drag action if status changed
+    if (newStatus !== task.status) {
+      recordStep('BUTTON_CLICK', `Move Task to ${newStatus}`, {
+        taskId: task.id,
+        taskText: task.clean_text,
+        fromStatus: task.status,
+        toStatus: newStatus,
+        action: 'drag-drop'
+      });
     }
 
     // Update local state

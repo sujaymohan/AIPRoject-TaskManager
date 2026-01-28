@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Loader2, Play, HelpCircle, Sparkles } from 'lucide-react';
 import { helpApi } from '../api/client';
-import { uiAutomation, type AutomationState } from '../utils/uiAutomation';
+import { WalkthroughDock } from './WalkthroughDock';
 import type { HelpAgentResponse } from '../types';
 import ReactMarkdown from 'react-markdown';
 
@@ -15,7 +15,8 @@ export function HelpAgentModal({ isOpen, onClose }: HelpAgentModalProps) {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<HelpAgentResponse | null>(null);
-  const [automationState, setAutomationState] = useState<AutomationState | null>(null);
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const quickQuestions = [
     'How do I add tasks?',
@@ -43,19 +44,35 @@ export function HelpAgentModal({ isOpen, onClose }: HelpAgentModalProps) {
     }
   };
 
-  const handleRunAutomation = async () => {
-    if (!response || !response.machine_actions.length) return;
-
-    try {
-      await uiAutomation.executeActions(
-        response.machine_actions,
-        (state: AutomationState) => {
-          setAutomationState(state);
-        }
-      );
-    } catch (error) {
-      console.error('Automation error:', error);
+  const handleRunAutomation = () => {
+    if (!response || !response.machine_actions.length) {
+      console.log('No response or no machine actions');
+      return;
     }
+
+    console.log('Starting walkthrough with', response.machine_actions.length, 'steps');
+    console.log('Machine actions:', response.machine_actions);
+
+    // Start transition - hide modal first, then show walkthrough after animation
+    setIsTransitioning(true);
+  };
+
+  // Handle the transition from modal to walkthrough
+  useEffect(() => {
+    if (isTransitioning) {
+      // Wait for modal exit animation to complete (200ms + buffer)
+      const timer = setTimeout(() => {
+        setShowWalkthrough(true);
+        setIsTransitioning(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isTransitioning]);
+
+  const handleWalkthroughClose = () => {
+    setShowWalkthrough(false);
+    // Also close the modal completely when walkthrough ends
+    onClose();
   };
 
   const handleQuickQuestion = (question: string) => {
@@ -63,9 +80,13 @@ export function HelpAgentModal({ isOpen, onClose }: HelpAgentModalProps) {
     handleAsk(question);
   };
 
+  // Hide modal UI when walkthrough is active or transitioning, but keep component mounted to preserve state
+  const showModalUI = isOpen && !showWalkthrough && !isTransitioning;
+
   return (
+    <>
     <AnimatePresence>
-      {isOpen && (
+      {showModalUI && (
         <>
           <motion.div
             className="modal-overlay"
@@ -141,29 +162,11 @@ export function HelpAgentModal({ isOpen, onClose }: HelpAgentModalProps) {
                         <button
                           className="run-automation-btn"
                           onClick={handleRunAutomation}
-                          disabled={automationState?.isRunning}
                         >
                           <Play size={16} />
-                          {automationState?.isRunning ? 'Running...' : 'Show Me'}
+                          Show Me
                         </button>
                       </div>
-
-                      {automationState && (
-                        <div className="automation-progress">
-                          <div className="progress-bar">
-                            <div
-                              className="progress-fill"
-                              style={{
-                                width: `${(automationState.currentStep / automationState.totalSteps) * 100}%`,
-                              }}
-                            />
-                          </div>
-                          <p className="progress-text">
-                            Step {automationState.currentStep} of {automationState.totalSteps}
-                            {automationState.currentMessage && `: ${automationState.currentMessage}`}
-                          </p>
-                        </div>
-                      )}
 
                       <div className="actions-list">
                         <p className="actions-label">
@@ -178,7 +181,6 @@ export function HelpAgentModal({ isOpen, onClose }: HelpAgentModalProps) {
                     onClick={() => {
                       setResponse(null);
                       setQuery('');
-                      setAutomationState(null);
                     }}
                   >
                     Ask another question
@@ -215,5 +217,15 @@ export function HelpAgentModal({ isOpen, onClose }: HelpAgentModalProps) {
         </>
       )}
     </AnimatePresence>
+
+    {/* Walkthrough Dock - Rendered via portal, stays visible even when modal UI is hidden */}
+    {showWalkthrough && response && response.machine_actions.length > 0 && (
+      <WalkthroughDock
+        steps={response.machine_actions}
+        methodName={query || 'Help Guide'}
+        onClose={handleWalkthroughClose}
+      />
+    )}
+    </>
   );
 }

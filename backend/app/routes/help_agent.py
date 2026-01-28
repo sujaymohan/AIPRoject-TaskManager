@@ -1,11 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 from typing import List, Optional, Literal
 from groq import Groq
 import time
 import threading
 import logging
 from app.core.config import settings
+from app.core.database import get_db
+from app.models.help_automation import HelpAutomationMethod
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +181,7 @@ class HelpAgentResponse(BaseModel):
     human_guide: str
     machine_actions: List[MachineAction]
     query: str
+    automation_method: Optional[str] = None  # Name of matched automation method if found
 
 # System prompt for the Help Agent
 HELP_AGENT_PROMPT = """You are the TaskFlow AI Help Agent.
@@ -390,13 +394,122 @@ MACHINE ACTION PLAN
 Now respond to the user's query."""
 
 
+def match_automation_method(query: str, db: Session) -> Optional[HelpAutomationMethod]:
+    """
+    Attempt to match user query to an existing automation method.
+    Uses simple keyword matching on method_name and description.
+    Returns the best matching method or None.
+    """
+    query_lower = query.lower()
+
+    # Get all methods
+    methods = db.query(HelpAutomationMethod).all()
+
+    if not methods:
+        return None
+
+    # Score each method based on keyword matches
+    best_match = None
+    best_score = 0
+
+    for method in methods:
+        score = 0
+        method_name_words = method.method_name.replace('_', ' ').lower().split()
+
+        # Check method name keywords
+        for word in method_name_words:
+            if len(word) > 3 and word in query_lower:
+                score += 2
+
+        # Check description if available
+        if method.description:
+            desc_words = method.description.lower().split()
+            for word in desc_words:
+                if len(word) > 4 and word in query_lower:
+                    score += 1
+
+        if score > best_score:
+            best_score = score
+            best_match = method
+
+    # Return match only if score is significant
+    return best_match if best_score >= 2 else None
+
+
+def convert_automation_to_machine_actions(method: HelpAutomationMethod) -> List[MachineAction]:
+    """
+    Convert recorded automation steps to machine actions format.
+    Maps action types and adds appropriate delays.
+    """
+    machine_actions = []
+
+    for step in method.steps:
+        action_type_map = {
+            'BUTTON_CLICK': 'click',
+            'TAB_OPEN': 'click',
+            'TAB_CLOSE': 'click',
+            'VIEW_CHANGE': 'click',
+            'MODAL_OPEN': 'click',
+            'MODAL_CLOSE': 'click',
+            'FORM_SUBMIT': 'click',
+            'ROUTE_CHANGE': 'open'
+        }
+
+        action_type = action_type_map.get(step.action_type, 'click')
+
+        # Extract metadata fields (use step_metadata column)
+        metadata = step.step_metadata or {}
+        selector = metadata.get('selector', f'#{step.target.lower().replace(" ", "-")}')
+
+        machine_action = MachineAction(
+            action=action_type,
+            selector=selector,
+            message=f"{step.action_type.replace('_', ' ').title()}: {step.target}",
+            delay=1000
+        )
+
+        # Only add if selector is allowed
+        if is_selector_allowed(selector):
+            machine_actions.append(machine_action)
+
+    return machine_actions
+
+
 @router.post("/ask", response_model=HelpAgentResponse)
-async def ask_help_agent(request: HelpAgentRequest):
+async def ask_help_agent(request: HelpAgentRequest, db: Session = Depends(get_db)):
     """
     Ask the TaskFlow AI Help Agent for guidance on how to use features.
+    First checks for recorded automation methods, then falls back to AI.
     Returns both a human-readable guide and machine-executable actions.
     """
     start_time = time.time()
+
+    # First, try to match with recorded automation methods
+    matched_method = match_automation_method(request.query, db)
+
+    if matched_method:
+        logger.info(f"Matched automation method: {matched_method.method_name}")
+
+        # Convert recorded steps to machine actions
+        machine_actions = convert_automation_to_machine_actions(matched_method)
+
+        # Generate human guide from recorded steps
+        human_guide = f"**{matched_method.description or 'Recorded Help Flow'}**\n\n"
+        human_guide += "Here's a step-by-step walkthrough:\n\n"
+
+        for step in matched_method.steps:
+            human_guide += f"{step.step_order + 1}. {step.action_type.replace('_', ' ').title()}: **{step.target}**\n"
+
+        human_guide += "\n_This is a pre-recorded help flow. Click 'Show Me' to see it in action._"
+
+        return HelpAgentResponse(
+            human_guide=human_guide,
+            machine_actions=machine_actions,
+            query=request.query,
+            automation_method=matched_method.method_name
+        )
+
+    # No match found, fall back to AI generation
     try:
         # Use Groq's free API with llama model
         chat_completion = groq_client.chat.completions.create(
@@ -476,7 +589,8 @@ async def ask_help_agent(request: HelpAgentRequest):
         return HelpAgentResponse(
             human_guide=human_guide,
             machine_actions=machine_actions,
-            query=request.query
+            query=request.query,
+            automation_method=None
         )
 
     except Exception as e:

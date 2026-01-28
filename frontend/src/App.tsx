@@ -5,6 +5,7 @@ import { TaskPasteArea, TaskDashboard, OnboardingPage } from './components';
 import { OAuthCallback } from './components/OAuthCallback';
 import { taskApi } from './api/client';
 import { useUser } from './contexts/UserContext';
+import { HelpRecorderProvider } from './contexts/HelpRecorderContext';
 import type { Task } from './types';
 
 type View = 'onboarding' | 'paste' | 'dashboard';
@@ -95,77 +96,79 @@ function App() {
   }
 
   return (
-    <div className="app">
-      <AnimatePresence mode="wait">
-        {view === 'onboarding' ? (
-          <motion.div
-            key="onboarding"
-            {...pageTransition}
-            style={{ height: '100vh' }}
-          >
-            <OnboardingPage onComplete={handleOnboardingComplete} />
-          </motion.div>
-        ) : view === 'paste' ? (
-          <motion.div
-            key="paste"
-            className="paste-view"
-            {...pageTransition}
-          >
-            <header className="app-header">
-              <motion.div
-                className="logo"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-              >
-                <div className="logo-icon">
-                  <Zap size={24} />
-                </div>
-                <h1>TaskFlow AI</h1>
-              </motion.div>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-              >
-                Transform your to-do list into an organized, intelligent workflow
-              </motion.p>
-            </header>
-
+    <HelpRecorderProvider>
+      <div className="app">
+        <AnimatePresence mode="wait">
+          {view === 'onboarding' ? (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              key="onboarding"
+              {...pageTransition}
+              style={{ height: '100vh' }}
             >
-              <TaskPasteArea onTasksParsed={handleTasksParsed} />
+              <OnboardingPage onComplete={handleOnboardingComplete} />
             </motion.div>
+          ) : view === 'paste' ? (
+            <motion.div
+              key="paste"
+              className="paste-view"
+              {...pageTransition}
+            >
+              <header className="app-header">
+                <motion.div
+                  className="logo"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                >
+                  <div className="logo-icon">
+                    <Zap size={24} />
+                  </div>
+                  <h1>TaskFlow AI</h1>
+                </motion.div>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                >
+                  Transform your to-do list into an organized, intelligent workflow
+                </motion.p>
+              </header>
 
-            {tasks.length > 0 && (
-              <motion.button
-                className="back-btn"
-                onClick={() => setView('dashboard')}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
               >
-                <ArrowLeft size={16} />
-                Back to dashboard
-              </motion.button>
-            )}
-          </motion.div>
-        ) : (
-          <motion.div
-            key="dashboard"
-            {...pageTransition}
-            style={{ height: '100vh' }}
-          >
-            <TaskDashboard initialTasks={tasks} onAddMore={handleAddMore} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+                <TaskPasteArea onTasksParsed={handleTasksParsed} />
+              </motion.div>
+
+              {tasks.length > 0 && (
+                <motion.button
+                  className="back-btn"
+                  onClick={() => setView('dashboard')}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <ArrowLeft size={16} />
+                  Back to dashboard
+                </motion.button>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="dashboard"
+              {...pageTransition}
+              style={{ height: '100vh' }}
+            >
+              <TaskDashboard initialTasks={tasks} onAddMore={handleAddMore} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </HelpRecorderProvider>
   );
 }
 

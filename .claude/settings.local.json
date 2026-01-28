@@ -41,7 +41,8 @@
       "Bash(powershell \"Stop-Process -Id 26272 -Force\")",
       "Bash(powershell \"Stop-Process -Id 12104 -Force; Stop-Process -Id 18708 -Force\")",
       "Bash(powershell:*)",
-      "Bash(./venv/Scripts/python:*)"
+      "Bash(./venv/Scripts/python:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

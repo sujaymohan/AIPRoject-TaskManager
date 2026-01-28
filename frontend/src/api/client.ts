@@ -241,6 +241,89 @@ export const helpApi = {
   },
 };
 
+export interface HelpAutomationStep {
+  step_order: number;
+  action_type: string;
+  target: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface HelpAutomationMethodCreate {
+  method_name: string;
+  description?: string;
+  steps: HelpAutomationStep[];
+  created_by: string;
+}
+
+export interface HelpAutomationMethodResponse {
+  id: string;
+  method_name: string;
+  description?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  steps: Array<{
+    id: string;
+    method_id: string;
+    step_order: number;
+    action_type: string;
+    target: string;
+    metadata?: Record<string, unknown>;
+    created_at: string;
+  }>;
+}
+
+export interface HelpAutomationMethodListResponse {
+  id: string;
+  method_name: string;
+  description?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  step_count: number;
+}
+
+export interface HelpRunResponse {
+  method_name: string;
+  description?: string;
+  steps: Array<{
+    id: string;
+    method_id: string;
+    step_order: number;
+    action_type: string;
+    target: string;
+    metadata?: Record<string, unknown>;
+    created_at: string;
+  }>;
+  total_steps: number;
+}
+
+export const helpAutomationApi = {
+  createMethod: async (data: HelpAutomationMethodCreate): Promise<HelpAutomationMethodResponse> => {
+    const response = await api.post<HelpAutomationMethodResponse>('/help/automation', data);
+    return response.data;
+  },
+
+  listMethods: async (): Promise<HelpAutomationMethodListResponse[]> => {
+    const response = await api.get<HelpAutomationMethodListResponse[]>('/help/automation');
+    return response.data;
+  },
+
+  getMethod: async (methodName: string): Promise<HelpAutomationMethodResponse> => {
+    const response = await api.get<HelpAutomationMethodResponse>(`/help/automation/${methodName}`);
+    return response.data;
+  },
+
+  runMethod: async (methodName: string): Promise<HelpRunResponse> => {
+    const response = await api.post<HelpRunResponse>('/help/run', { method_name: methodName });
+    return response.data;
+  },
+
+  deleteMethod: async (methodName: string): Promise<void> => {
+    await api.delete(`/help/automation/${methodName}`);
+  },
+};
+
 export interface CalendarEventData {
   id: string;
   subject: string;

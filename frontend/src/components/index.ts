@@ -10,3 +10,7 @@ export { OnboardingPage } from './OnboardingPage';
 export { SettingsPanel } from './SettingsPanel';
 export { TeamsMentionsModal } from './TeamsMentionsModal';
 export { HelpAgentModal } from './HelpAgentModal';
+export { VisualWalkthrough } from './VisualWalkthrough';
+export { WalkthroughDock } from './WalkthroughDock';
+export { HelpRecorderPanel } from './HelpRecorderPanel';
+export { RecordableButton } from './RecordableButton';

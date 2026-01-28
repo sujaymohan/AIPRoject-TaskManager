@@ -189,6 +189,7 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
       >
         <motion.div
           ref={headerRef}
+          id="reminder-panel-header"
           className="reminder-header"
           onClick={() => setExpanded(!expanded)}
           whileHover={{ backgroundColor: 'var(--bg-hover)' }}
