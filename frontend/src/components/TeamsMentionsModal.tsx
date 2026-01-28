@@ -459,9 +459,15 @@ export function TeamsMentionsModal({
     // Apply sorting
     if (sortBy === 'created') {
       filtered.sort((a, b) => {
-        const dateA = new Date(a.requested_at || a.timestamp).getTime();
-        const dateB = new Date(b.requested_at || b.timestamp).getTime();
-        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+        // Use timestamp as primary sort field (it's always present)
+        const dateStrA = a.timestamp || a.requested_at || '';
+        const dateStrB = b.timestamp || b.requested_at || '';
+        const dateA = new Date(dateStrA).getTime();
+        const dateB = new Date(dateStrB).getTime();
+        // Handle invalid dates by treating them as oldest
+        const validA = !isNaN(dateA) ? dateA : 0;
+        const validB = !isNaN(dateB) ? dateB : 0;
+        return sortOrder === 'asc' ? validA - validB : validB - validA;
       });
     }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Bell, ChevronDown, AlertTriangle, Calendar, X, Loader2, Clock, AlertCircle } from 'lucide-react';
@@ -18,6 +19,8 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
   const [snoozing, setSnoozing] = useState<Set<number>>(new Set());
   const notifiedIds = useRef<Set<number>>(new Set());
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
 
   // Request notification permission on mount
   useEffect(() => {
@@ -112,6 +115,38 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
     };
   }, [refreshTrigger]); // Removed fetchReminders from dependencies to prevent interval stacking
 
+  // Update dropdown position when expanded
+  useEffect(() => {
+    if (expanded && headerRef.current) {
+      const rect = headerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8, // 8px gap below the header
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, [expanded]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!expanded) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const dropdown = document.getElementById('reminder-dropdown-portal');
+      if (
+        headerRef.current &&
+        !headerRef.current.contains(target) &&
+        dropdown &&
+        !dropdown.contains(target)
+      ) {
+        setExpanded(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [expanded]);
+
   const handleDismiss = async (id: number) => {
     try {
       await reminderApi.delete(id);
@@ -145,61 +180,73 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
   const upcomingReminders = reminders.filter(r => !notifications.find(n => n.id === r.id));
 
   return (
-    <motion.div
-      className={`reminder-panel ${expanded ? 'expanded' : ''}`}
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
+    <>
       <motion.div
-        className="reminder-header"
-        onClick={() => setExpanded(!expanded)}
-        whileHover={{ backgroundColor: 'var(--bg-hover)' }}
-        whileTap={{ scale: 0.995 }}
+        className={`reminder-panel ${expanded ? 'expanded' : ''}`}
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
       >
-        <span className="bell-icon">
-          <Bell size={18} />
-          <AnimatePresence>
-            {notifications.length > 0 && (
-              <motion.span
-                className="notification-badge"
-                initial={{ scale: 0 }}
-                animate={{ scale: [1, 1.2, 1] }}
-                exit={{ scale: 0 }}
-                transition={{
-                  scale: { duration: 0.5, repeat: Infinity, repeatDelay: 2 },
-                  type: 'spring',
-                  stiffness: 500,
-                  damping: 25
-                }}
-              >
-                {notifications.length}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </span>
-        <span className="reminder-title">
-          Reminders
-          <span className="count">({reminders.length})</span>
-        </span>
-        <motion.span
-          className="expand-icon"
-          animate={{ rotate: expanded ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
+        <motion.div
+          ref={headerRef}
+          className="reminder-header"
+          onClick={() => setExpanded(!expanded)}
+          whileHover={{ backgroundColor: 'var(--bg-hover)' }}
+          whileTap={{ scale: 0.995 }}
         >
-          <ChevronDown size={18} />
-        </motion.span>
-      </motion.div>
-
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            className="reminder-content"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+          <span className="bell-icon">
+            <Bell size={18} />
+            <AnimatePresence>
+              {notifications.length > 0 && (
+                <motion.span
+                  className="notification-badge"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: [1, 1.2, 1] }}
+                  exit={{ scale: 0 }}
+                  transition={{
+                    scale: { duration: 0.5, repeat: Infinity, repeatDelay: 2 },
+                    type: 'spring',
+                    stiffness: 500,
+                    damping: 25
+                  }}
+                >
+                  {notifications.length}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </span>
+          <span className="reminder-title">
+            Reminders
+            <span className="count">({reminders.length})</span>
+          </span>
+          <motion.span
+            className="expand-icon"
+            animate={{ rotate: expanded ? 180 : 0 }}
             transition={{ duration: 0.2 }}
           >
+            <ChevronDown size={18} />
+          </motion.span>
+        </motion.div>
+      </motion.div>
+
+      {/* Dropdown rendered via portal to avoid z-index stacking context issues */}
+      {createPortal(
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              id="reminder-dropdown-portal"
+              className="reminder-dropdown-portal"
+              style={{
+                position: 'fixed',
+                top: dropdownPosition.top,
+                right: dropdownPosition.right,
+                zIndex: 999999,
+              }}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
             {loading && (
               <motion.div
                 className="loading-small"
@@ -371,7 +418,9 @@ export function ReminderPanel({ refreshTrigger }: ReminderPanelProps) {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
-    </motion.div>
+      </AnimatePresence>,
+      document.body
+    )}
+    </>
   );
 }

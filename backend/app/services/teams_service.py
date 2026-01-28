@@ -5,11 +5,16 @@ This service handles fetching messages where the user is @mentioned
 using Microsoft Graph API.
 """
 import httpx
+import time
+import threading
+import logging
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
 from app.core.config import settings
 from app.utils.message_merger import MessageMerger, MessageMergerConfig
+
+logger = logging.getLogger(__name__)
 
 
 class TeamsMention(BaseModel):
@@ -83,6 +88,28 @@ class TeamsService:
     def is_configured(self) -> bool:
         """Check if the service is properly configured."""
         return bool(self.client_id and self.client_secret and self.tenant_id)
+
+    @staticmethod
+    def _log_quota(success: bool, response_time_ms: float):
+        """Log API call to quota service (called in background thread)."""
+        try:
+            from app.core.database import SessionLocal
+            from app.services.quota_service import QuotaService
+
+            db = SessionLocal()
+            try:
+                QuotaService.log_api_call(
+                    db,
+                    provider="Microsoft Graph",
+                    model="Teams API v1.0",
+                    success=success,
+                    response_time_ms=response_time_ms,
+                    daily_limit=2000,
+                )
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Failed to log Microsoft Graph quota: {e}")
 
     def _apply_message_merging(self, mentions: List[TeamsMention]) -> List[TeamsMention]:
         """
@@ -512,6 +539,9 @@ class TeamsService:
         """
         import re
 
+        start_time = time.time()
+        api_call_count = 0
+
         try:
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -676,6 +706,13 @@ class TeamsService:
                                 # Apply message merging before returning
                                 merged_mentions = self._apply_message_merging(mentions)
                                 print(f"[TEAMS] After merging: {len(merged_mentions)} messages ({len(mentions)} original)")
+                                # Log successful API usage
+                                response_time_ms = (time.time() - start_time) * 1000
+                                threading.Thread(
+                                    target=self._log_quota,
+                                    args=(True, response_time_ms),
+                                    daemon=True,
+                                ).start()
                                 return merged_mentions
 
                     if mentions:
@@ -683,20 +720,48 @@ class TeamsService:
                         # Apply message merging before returning
                         merged_mentions = self._apply_message_merging(mentions[:limit])
                         print(f"[TEAMS] After merging: {len(merged_mentions)} messages ({len(mentions[:limit])} original)")
+                        # Log successful API usage
+                        response_time_ms = (time.time() - start_time) * 1000
+                        threading.Thread(
+                            target=self._log_quota,
+                            args=(True, response_time_ms),
+                            daemon=True,
+                        ).start()
                         return merged_mentions
                 else:
                     print(f"[TEAMS] Chats endpoint failed: {chats_response.status_code} - {chats_response.text}")
 
                 # If no messages found, return mock data
                 print("[TEAMS] No messages found, returning mock data")
+                # Log API usage even for mock data fallback
+                response_time_ms = (time.time() - start_time) * 1000
+                threading.Thread(
+                    target=self._log_quota,
+                    args=(True, response_time_ms),
+                    daemon=True,
+                ).start()
                 return self._get_mock_mentions(limit)
 
         except TeamsServiceError:
+            # Log failed API call
+            response_time_ms = (time.time() - start_time) * 1000
+            threading.Thread(
+                target=self._log_quota,
+                args=(False, response_time_ms),
+                daemon=True,
+            ).start()
             raise
         except Exception as e:
             # Sanitize error message to prevent encoding issues
             error_str = _sanitize_for_print(str(e))
             print(f"[TEAMS] Error fetching mentions with token: {error_str}")
+            # Log failed API call
+            response_time_ms = (time.time() - start_time) * 1000
+            threading.Thread(
+                target=self._log_quota,
+                args=(False, response_time_ms),
+                daemon=True,
+            ).start()
             raise TeamsServiceError(f"Failed to fetch mentions: {error_str}")
 
 

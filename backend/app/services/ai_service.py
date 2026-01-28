@@ -4,6 +4,10 @@ import google.generativeai as genai
 from typing import Optional, List
 from app.core.config import settings
 from app.models.task import TaskCategory
+import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Configure the API
 genai.configure(api_key=settings.GOOGLE_API_KEY)
@@ -209,6 +213,28 @@ class TaskValidator:
 class AIService:
     """AI-powered task analysis service using Google Gemini."""
 
+    @staticmethod
+    def _log_quota(provider: str, model: str, success: bool, response_time_ms: float):
+        """Log API call to quota service (called asynchronously)."""
+        try:
+            from app.core.database import SessionLocal
+            from app.services.quota_service import QuotaService
+
+            db = SessionLocal()
+            try:
+                QuotaService.log_api_call(
+                    db,
+                    provider=provider,
+                    model=model,
+                    success=success,
+                    response_time_ms=response_time_ms,
+                    daily_limit=1000,
+                )
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Failed to log quota: {e}")
+
     @classmethod
     async def analyze_tasks(cls, tasks_text: list[str]) -> list[dict]:
         """
@@ -306,8 +332,18 @@ Return ONLY valid JSON array:
 ]"""
 
         try:
+            start_time = time.time()
             response = model.generate_content(prompt)
+            response_time_ms = (time.time() - start_time) * 1000
             response_text = response.text.strip()
+
+            # Log quota usage
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", True, response_time_ms),
+                daemon=True,
+            ).start()
 
             # Clean up markdown code blocks
             if response_text.startswith("```"):
@@ -360,6 +396,13 @@ Return ONLY valid JSON array:
 
         except Exception as e:
             print(f"[AI] Error analyzing tasks: {e}")
+            # Log failed API call
+            import threading
+            threading.Thread(
+                target=AIService._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", False, 0),
+                daemon=True,
+            ).start()
             return [{
                 "category": "other",
                 "time": None,
@@ -379,10 +422,27 @@ Task: {task_text}
 Return ONLY the message text, no quotes or explanation."""
 
         try:
+            start_time = time.time()
             response = model.generate_content(prompt)
+            response_time_ms = (time.time() - start_time) * 1000
+
+            # Log quota usage
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", True, response_time_ms),
+                daemon=True,
+            ).start()
+
             return response.text.strip()
         except Exception as e:
             print(f"[AI] Error generating message: {e}")
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", False, 0),
+                daemon=True,
+            ).start()
             return f"Hey! Quick note about: {task_text[:50]}..."
 
     @classmethod
@@ -400,8 +460,18 @@ Return ONLY valid JSON, no other text. Example:
 {{"subject": "Subject here", "body": "Email body here"}}"""
 
         try:
+            start_time = time.time()
             response = model.generate_content(prompt)
+            response_time_ms = (time.time() - start_time) * 1000
             response_text = response.text.strip()
+
+            # Log quota usage
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", True, response_time_ms),
+                daemon=True,
+            ).start()
 
             if response_text.startswith("```"):
                 lines = response_text.split("\n")
@@ -411,6 +481,12 @@ Return ONLY valid JSON, no other text. Example:
             return result.get("subject", "Regarding your request"), result.get("body", "")
         except Exception as e:
             print(f"[AI] Error generating email: {e}")
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", False, 0),
+                daemon=True,
+            ).start()
             return f"Regarding: {task_text[:40]}", f"Hi,\n\nI'm reaching out about: {task_text}\n\nBest regards"
 
     @classmethod
@@ -429,8 +505,18 @@ Return ONLY a JSON array of strings, no other text. Example:
 ["Step 1", "Step 2", "Step 3"]"""
 
         try:
+            start_time = time.time()
             response = model.generate_content(prompt)
+            response_time_ms = (time.time() - start_time) * 1000
             response_text = response.text.strip()
+
+            # Log quota usage
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", True, response_time_ms),
+                daemon=True,
+            ).start()
 
             if response_text.startswith("```"):
                 lines = response_text.split("\n")
@@ -440,6 +526,12 @@ Return ONLY a JSON array of strings, no other text. Example:
             return result if isinstance(result, list) else []
         except Exception as e:
             print(f"[AI] Error generating checklist: {e}")
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", False, 0),
+                daemon=True,
+            ).start()
             return [
                 "Review and test all changes locally",
                 "Run full test suite",
@@ -611,8 +703,18 @@ FINAL CHECKS BEFORE OUTPUT:
 If NO meaningful tasks found, return empty tasks array. NEVER fabricate tasks."""
 
         try:
+            start_time = time.time()
             response = model.generate_content(prompt)
+            response_time_ms = (time.time() - start_time) * 1000
             response_text = response.text.strip()
+
+            # Log quota usage
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", True, response_time_ms),
+                daemon=True,
+            ).start()
 
             if response_text.startswith("```"):
                 lines = response_text.split("\n")
@@ -650,6 +752,12 @@ If NO meaningful tasks found, return empty tasks array. NEVER fabricate tasks.""
 
         except Exception as e:
             print(f"[AI] Error analyzing messages: {e}")
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", False, 0),
+                daemon=True,
+            ).start()
             return {
                 "relevant_to_user": True,
                 "summary": "Unable to analyze message. Please try again.",
@@ -747,8 +855,18 @@ Return JSON array:
 IMPORTANT: For valid tasks, improved_text is MANDATORY and must be a complete rewritten sentence."""
 
         try:
+            start_time = time.time()
             response = model.generate_content(prompt)
+            response_time_ms = (time.time() - start_time) * 1000
             response_text = response.text.strip()
+
+            # Log quota usage
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", True, response_time_ms),
+                daemon=True,
+            ).start()
 
             if response_text.startswith("```"):
                 lines = response_text.split("\n")
@@ -790,6 +908,12 @@ IMPORTANT: For valid tasks, improved_text is MANDATORY and must be a complete re
 
         except Exception as e:
             print(f"[AI] Error reanalyzing tasks: {e}")
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", False, 0),
+                daemon=True,
+            ).start()
             # On error, return original tasks with validation applied
             for task in tasks:
                 task['is_valid'] = TaskValidator.is_meaningful_task(
@@ -828,8 +952,18 @@ Example: {{"2": [1], "3": [1, 2], "4": []}}
 Return ONLY valid JSON, no other text."""
 
         try:
+            start_time = time.time()
             response = model.generate_content(prompt)
+            response_time_ms = (time.time() - start_time) * 1000
             response_text = response.text.strip()
+
+            # Log quota usage
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", True, response_time_ms),
+                daemon=True,
+            ).start()
 
             if response_text.startswith("```"):
                 lines = response_text.split("\n")
@@ -847,4 +981,10 @@ Return ONLY valid JSON, no other text."""
             return dependencies
         except Exception as e:
             print(f"[AI] Error detecting dependencies: {e}")
+            import threading
+            threading.Thread(
+                target=cls._log_quota,
+                args=("Google Gemini", "gemini-2.5-flash", False, 0),
+                daemon=True,
+            ).start()
             return [[] for _ in tasks]

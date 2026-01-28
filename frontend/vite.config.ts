@@ -7,5 +7,32 @@ export default defineConfig({
   server: {
     // This ensures all routes return index.html for client-side routing
     historyApiFallback: true,
+    // Proxy API requests to backend
+    proxy: {
+      '/tasks': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/reminders': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/notifications': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/help': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/ai-quota': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/teams': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
   },
 })

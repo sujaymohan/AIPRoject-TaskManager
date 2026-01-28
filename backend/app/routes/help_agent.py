@@ -2,7 +2,34 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Literal
 from groq import Groq
+import time
+import threading
+import logging
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def _log_groq_quota(success: bool, response_time_ms: float):
+    """Log Groq API call to quota service (called in background thread)."""
+    try:
+        from app.core.database import SessionLocal
+        from app.services.quota_service import QuotaService
+
+        db = SessionLocal()
+        try:
+            QuotaService.log_api_call(
+                db,
+                provider="Groq Llama",
+                model="llama-3.3-70b-versatile",
+                success=success,
+                response_time_ms=response_time_ms,
+                daily_limit=500,
+            )
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Failed to log Groq quota: {e}")
 
 router = APIRouter(prefix="/help", tags=["help"])
 
@@ -369,6 +396,7 @@ async def ask_help_agent(request: HelpAgentRequest):
     Ask the TaskFlow AI Help Agent for guidance on how to use features.
     Returns both a human-readable guide and machine-executable actions.
     """
+    start_time = time.time()
     try:
         # Use Groq's free API with llama model
         chat_completion = groq_client.chat.completions.create(
@@ -386,6 +414,14 @@ async def ask_help_agent(request: HelpAgentRequest):
             temperature=0.7,
             max_tokens=2048
         )
+        response_time_ms = (time.time() - start_time) * 1000
+
+        # Log successful API call
+        threading.Thread(
+            target=_log_groq_quota,
+            args=(True, response_time_ms),
+            daemon=True,
+        ).start()
 
         response_text = chat_completion.choices[0].message.content
 
@@ -444,4 +480,11 @@ async def ask_help_agent(request: HelpAgentRequest):
         )
 
     except Exception as e:
+        # Log failed API call
+        response_time_ms = (time.time() - start_time) * 1000
+        threading.Thread(
+            target=_log_groq_quota,
+            args=(False, response_time_ms),
+            daemon=True,
+        ).start()
         raise HTTPException(status_code=500, detail=f"Help agent error: {str(e)}")

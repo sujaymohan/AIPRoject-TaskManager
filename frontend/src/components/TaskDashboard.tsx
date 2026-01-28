@@ -12,6 +12,7 @@ import { MessageAnalyzer } from './MessageAnalyzer';
 import { TeamsMentionsModal } from './TeamsMentionsModal';
 import { HelpAgentModal } from './HelpAgentModal';
 import { CalendarTab } from './CalendarTab';
+import { AIQuotaStatus } from './AIQuotaStatus';
 import { taskApi } from '../api/client';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
@@ -240,6 +241,8 @@ export function TaskDashboard({ initialTasks, onAddMore }: TaskDashboardProps) {
 
         {/* Right: User Controls */}
         <div className="header-right">
+          <AIQuotaStatus />
+
           <ReminderPanel refreshTrigger={refreshTrigger} />
 
           <motion.button
